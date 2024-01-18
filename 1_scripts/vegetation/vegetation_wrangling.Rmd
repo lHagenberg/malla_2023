@@ -1,0 +1,49 @@
+---
+title: "vegetation_data"
+author: "Liyenne"
+date: "2023-09-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r include = FALSE} 
+setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_data_analysis") 
+
+require(tidyr)
+require(dplyr)
+```
+
+# Raw data
+```{r echo = FALSE}
+data_raw <- readr::read_csv("~/Project Green Arctic/2_malla/1_data/field_data/1_data_analysis/2_input/1_raw_data/vegetation_data_raw.csv")
+
+data_raw %>% head(10)
+```
+# Transform data format
+```{r}
+vegetation_data <- data_raw %>% 
+   pivot_longer(salix:rock, names_to = 'type', values_to = 'cover') 
+
+vegetation_data <- vegetation_data %>%
+  select(code, transect, distance, type, cover)
+
+vegetation_data <- vegetation_data %>%
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  select(code, transect, country, everything())
+
+vegetation_data$code <- as.factor(vegetation_data$code)
+vegetation_data$transect <- as.factor(vegetation_data$transect)
+vegetation_data$distance <- as.factor(vegetation_data$distance)
+vegetation_data$type <- as.factor(vegetation_data$type)
+
+vegetation_data %>% head(15)
+```
+
+```{r include=FALSE}
+vegetation_data %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_analysis/3_output/1_data_products/vegetation_data.csv')
+```

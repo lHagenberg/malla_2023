@@ -1,0 +1,58 @@
+---
+title: "tree_leaf_sections"
+author: "Liyenne"
+date: "2024-01-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r packages, include = FALSE} 
+require(tidyverse)
+require(ggpubr)
+
+#install.packages("remotes")
+#remotes::install_github("Between-the-Fjords/dataDownloader")
+require(dataDownloader)
+```
+
+```{r (down)load data}
+get_file(node = "3b2xy",
+         file = "tree_core_data_raw.xlsx",
+         path = "2_input/1_raw_data", 
+         remote_path = "raw_data") 
+
+data_raw <- openxlsx::read.xlsx("2_input/1_raw_data/tree_core_data_raw.xlsx")
+```
+
+```{r}
+data <- data_raw %>% 
+  select(!distance:n_stems) %>% 
+  pivot_longer(!code, names_to = "section", values_to = "leaves")
+
+data$section <- as.numeric(data$section)
+data$leaves <- as.factor(data$leaves)
+
+data <- data %>% 
+  mutate(country = as.factor(ifelse(grepl('N', code), 'Norway', 'Finland'))) %>%
+  select(code, country, section, leaves)
+```
+
+```{r}
+data %>%  
+  filter(leaves == 1) %>% 
+  gghistogram(x = "section", color = "country", add_density = TRUE)
+```
+
+
+```{r}
+data %>% 
+  filter(leaves == 1) %>% 
+  ggdensity(x = "section", color = "country")
+```
+
+
+

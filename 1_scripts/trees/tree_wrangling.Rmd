@@ -1,0 +1,159 @@
+---
+title: "1_tree_data"
+author: "Liyenne"
+date: "2023-09-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r include = FALSE} 
+setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling") 
+
+require(tidyr)
+require(dplyr)
+```
+
+# raw data
+```{r echo = FALSE}
+data_raw <- readr::read_csv("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/2_input/tree_data_raw.csv")
+
+data_raw %>% head(10)
+```
+
+# create new variables
+**country**
+```{r}
+tree_data <- data_raw %>% 
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  select(transect, country, distance, height, diameter, n_stems)
+
+tree_data %>% head(10)
+```
+
+**transect section**
+```{r}
+tree_data <- tree_data %>% 
+  mutate(section = as.factor(ifelse(distance <= 0, 'forest', 
+                   ifelse(distance > 0 & distance <= 50, 'treeline', 
+                   ifelse(distance > 50, 'tundra', 'x'))))) %>%
+  select(transect, country, section, everything())
+
+tree_data %>% head(10)
+```
+
+**tree classes**
+Trees are classified as:
+
+- seedlings (e.g., individuals smaller than 50 cm) 
+- saplings (e.g., individuals smaller than 2m) 
+- trees (e.g., individuals taller than 2m)
+```{r}
+tree_data <- tree_data %>% 
+ mutate(class = as.factor(ifelse(is.na(height), 'dead',
+                   ifelse(height <= 50, 'seedling', 
+                   ifelse(height > 50 & height < 200, 'sapling', 
+                   ifelse(height >= 200, 'tree', 'x')))))) %>%
+  select(transect, country, section, distance, height, class, everything())
+
+tree_data %>% head(10)
+```
+
+```{r include=FALSE}
+tree_data %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/tree_data.csv')
+```
+
+# summarise data by transect
+```{r}
+tree_groups <- tree_data %>% 
+  group_by(transect, section, class) 
+
+tree_data_transect_summary <- tree_groups %>%
+  summarise(n = n()) %>%
+  na.omit()
+
+tree_data_transect_summary <- tree_groups %>%
+  summarise(mean_height = mean(height)) %>%
+  na.omit() %>%
+  full_join(tree_data_transect_summary,.)
+
+tree_data_transect_summary <- tree_groups %>%
+  na.omit() %>%
+  summarise(mean_diameter = mean(diameter)) %>%
+  full_join(tree_data_transect_summary,.)
+
+tree_data_transect_summary <- tree_groups %>%
+  na.omit() %>%
+  summarise(mean_n_stems = mean(n_stems)) %>%
+  full_join(tree_data_transect_summary,.)
+
+tree_data_transect_summary <- tree_data_transect_summary %>% 
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  select(transect, country, everything())
+
+tree_data_transect_summary%>%
+  head(10)
+```
+
+```{r include=FALSE}
+tree_data_transect_summary %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data.csv')
+```
+
+```{r}
+tr <- tree_data %>%
+  distinct(transect) %>%
+  pull(transect)
+tree_grid <- expand.grid(transect = tr, 
+            section = c("forest", "treeline", "tundra"), 
+            class = c("seedling", "sapling", "tree", "dead")); rm(tr)
+
+tree_data_transect_summary <- full_join(tree_data_transect_summary, tree_grid) %>% 
+  arrange(transect, section, class)%>% 
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>% 
+  mutate(n = if_else(is.na(n), 0, n)); rm (tree_grid)
+```
+
+```{r include=FALSE}
+tree_data_transect_summary %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data_full.csv')
+```
+
+# summarise data by country
+```{r}
+tree_groups <- tree_data %>% 
+  group_by(section, class, country) 
+
+tree_data_country_summary <- tree_groups %>%
+  summarise(n = n()) %>%
+  na.omit() %>%
+  select(country, section, class, n)
+
+tree_data_country_summary <- tree_groups %>%
+  summarise(mean_height = mean(height)) %>%
+  na.omit() %>%
+  full_join(tree_data_country_summary,.)
+
+tree_data_country_summary <- tree_groups %>%
+  na.omit() %>%
+  summarise(mean_diameter = mean(diameter)) %>%
+  full_join(tree_data_country_summary,.)
+
+tree_data_country_summary <- tree_groups %>%
+  na.omit() %>%
+  summarise(mean_n_stems = mean(n_stems)) %>%
+  full_join(tree_data_country_summary,.)
+
+
+tree_data_country_summary%>%
+  head(10)
+```
+
+```{r include=FALSE}
+tree_data_country_summary %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/tree_data_country_summary.csv')
+```

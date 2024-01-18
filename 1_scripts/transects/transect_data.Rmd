@@ -1,0 +1,74 @@
+---
+title: "transect_data"
+author: "Liyenne"
+date: "2023-10-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r packages, include = FALSE} 
+setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/") 
+
+require(tidyr)
+require(dplyr)
+
+require(terra)
+```
+
+## Import vector and raster data
+```{r read vector and raster data}
+# vector data
+transects <- vect("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/2_input/1_raw_data/geo_data/transects.gpkg")
+
+# raster data
+dtm <- rast("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/2_input/1_raw_data/geo_data/study_area_dtm.tif")
+
+slope <- rast("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/2_input/1_raw_data/geo_data/study_area_slope.tif")
+
+aspect <- rast("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/2_input/1_raw_data/geo_data/study_area_aspect.tif")
+
+twi <- rast("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/2_input/1_raw_data/geo_data/twi.tif")
+```
+
+## extract environmental variables for transects
+```{r include =FALSE}
+# align projections
+transects <- project(transects, crs(dtm)) # only the transects are in a different projection (WGS 84)
+crs(transects)
+```
+
+
+```{r}
+transect_data <- values(transects)
+
+transect_data <- extract(dtm, transects, fun = mean) %>% 
+  select(Z) %>% 
+  rename(elevation = Z) %>% 
+  cbind(transect_data, .)
+
+transect_data <- extract(slope, transects, fun = mean) %>% 
+  select(slope) %>% 
+  cbind(transect_data, .)
+
+transect_data <- extract(aspect, transects, fun = mean) %>% 
+  select(aspect) %>% 
+  cbind(transect_data, .)
+
+transect_data <- extract(twi, transects, fun = mean) %>% 
+  select(twi) %>% 
+  cbind(transect_data, .) %>% 
+  select(-id)
+
+head(transect_data, 10)
+```
+
+```{r}
+write_csv(transect_data, "~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/transect_data.csv")
+```
+
+
+

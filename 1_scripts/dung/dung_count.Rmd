@@ -1,0 +1,124 @@
+---
+title: "dung_counts"
+author: "Liyenne"
+date: "2023-09-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r include = FALSE} 
+setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling") 
+
+require(tidyr)
+require(dplyr)
+```
+
+# Raw data
+```{r echo = FALSE}
+data_raw <- readr::read_csv("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/2_input/dung_count_data_raw.csv")
+
+data_raw %>% head(10)
+```
+
+# Transform data format
+```{r}
+dung_counts <- data_raw %>% 
+   pivot_longer(!transect, names_to = 'distance', values_to = 'count') 
+
+dung_counts$transect <- as.factor(dung_counts$transect)
+dung_counts$distance <- as.numeric(dung_counts$distance)
+
+dung_counts <- dung_counts %>% replace_na(list(count = 0))
+
+dung_counts %>% head(15)
+```
+
+# Create variables
+**country**
+```{r}
+dung_counts <- dung_counts %>% 
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  select(transect, country, everything())
+
+dung_counts %>% head(10)
+```
+
+**transect sections**
+```{r}
+dung_counts <- dung_counts %>% 
+  mutate(section = as.factor(ifelse(distance <= 0, 'forest', 
+                   ifelse(distance > 0 & distance <= 50, 'treeline', 
+                   ifelse(distance > 50, 'tundra', 'x'))))) %>%
+  select(transect, country, distance, section, count)
+
+dung_counts %>% head(10)
+```
+
+```{r include=FALSE}
+dung_counts %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/dung_count_data.csv')
+```
+
+# Summarise data by transect
+```{r}
+dung_groups <- dung_counts %>% 
+  group_by(transect, section) 
+
+dung_data_transect_summary <- dung_groups %>%
+  summarise(total_dung = sum(count))
+
+dung_data_transect_summary <- dung_groups %>%
+  filter(count > 0) %>%
+  summarise(frequency = n()) %>%
+  full_join(dung_data_transect_summary,.) %>%
+  replace_na(list(frequency = 0))
+
+dung_data_transect_summary <- dung_data_transect_summary %>% 
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  select(transect, country, everything())
+
+dung_data_transect_summary%>%
+  head(10)
+```
+
+```{r include=FALSE}
+dung_data_transect_summary %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/dung_data_transect_summary.csv')
+```
+
+# Summarise data by country
+```{r}
+dung_groups <- dung_counts %>% 
+  group_by(country, section) 
+
+dung_data_country_summary <- dung_groups %>%
+  summarise(total_dung = sum(count))
+
+dung_data_country_summary <- dung_groups %>%
+  filter(count > 0) %>%
+  summarise(frequency = n()) %>%
+  full_join(dung_data_country_summary,.)
+
+#dung_groups <- dung_data_transect_summary %>% 
+#  group_by(country, section) 
+#
+#dung_data_country_summary <- dung_groups %>%
+#  summarise(mean_total_dung = mean(total_dung)) %>%
+#  full_join(dung_data_country_summary,.)
+#
+#dung_data_country_summary <- dung_groups %>%
+#  summarise(mean_frequency = mean(frequency)) %>%
+#  full_join(dung_data_country_summary,.)
+
+dung_data_country_summary %>%
+  print()
+```
+
+```{r include=FALSE}
+dung_data_country_summary %>%
+  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/dung_data_country_summary.csv')
+```

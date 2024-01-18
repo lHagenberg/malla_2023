@@ -1,0 +1,48 @@
+---
+title: "dung_data_analysis"
+author: "Liyenne"
+date: "2023-09-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r include = FALSE} 
+setwd("~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis") 
+
+require(tidyr)
+require(dplyr)
+require(ggplot2)
+```
+
+# Data
+**raw dung counts**
+```{r echo = FALSE}
+dung_count <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis/2_input/dung_count_data.csv')
+
+dung_count %>% head(10)
+```
+
+**transect summary data**
+```{r echo = FALSE}
+dung_transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis/2_input/dung_data_transect_summary.csv')
+
+dung_transect_data %>% head(10)
+```
+
+# Plotting
+**dung frequencies**
+```{r}
+dung_transect_data %>%
+  ggplot(aes(section, frequency, fill = country)) + 
+  geom_boxplot() 
+```
+**total dung found**
+```{r}
+dung_transect_data %>%
+  ggplot(aes(section, total_dung, fill = country)) + 
+  geom_boxplot() 
+```

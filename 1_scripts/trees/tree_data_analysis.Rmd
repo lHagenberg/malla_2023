@@ -1,0 +1,349 @@
+---
+title: "tree_data_analysis"
+author: "Liyenne"
+date: "2023-09-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r include = FALSE} 
+setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/") 
+
+require(kableExtra)
+
+require(tidyr)
+require(dplyr)
+
+require(lme4)
+require(lmerTest)
+require(lsmeans)
+
+require(ggplot2)
+require(ggpubr)
+require(flexplot)
+```
+
+# Data
+**individual tree data**
+```{r include = FALSE}
+tree_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis/2_input/tree_data.csv')
+```
+
+```{r echo = FALSE}
+tree_data %>% head(10)
+```
+
+**transect meta/environmental data**
+```{r include = FALSE}
+# transect meta data
+transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/transect_data.csv')
+
+transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/dung_data_transect_summary.csv') %>% 
+  select(-frequency) %>% 
+  rename(habitat = section) %>% 
+  full_join(transect_data)
+```
+
+```{r echo = FALSE}
+transect_data %>% head(10)
+```
+
+
+```{r include = FALSE}
+# tree transect summary data
+tree_transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data.csv')
+```
+
+```{r include = FALSE}
+tree_transect_data %>% head(10)
+```
+
+**tree data summarized per transect**
+```{r include = FALSE}
+tree_transect_data_full <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data_full.csv')
+```
+
+```{r echo = FALSE}
+tree_transect_data_full %>% head(10)
+```
+
+# Analysis
+```{r include = FALSE}
+#of trees in all size classes (e.g., seedlings, smaller than 50 cm; saplings, smaller than 2m; adult trees, taller than 2m)
+tree_data %>%
+  na.omit() %>%
+  ggplot(aes(distance, color = country, fill = country)) + 
+  geom_histogram(alpha = 0.5, 
+                position="identity") +
+  geom_vline(aes(xintercept = 0), linetype = 'dashed') +
+  facet_wrap(~country)
+```
+
+
+```{r include = FALSE}
+#only adult trees (taller than 2m)
+tree_data %>%
+  filter(class == 'tree') %>%
+  ggplot(aes(distance, color = country, fill = country)) + 
+  geom_histogram(alpha = 0.5, 
+                position="identity") +
+  geom_vline(aes(xintercept = 0), linetype = 'dashed') +
+  facet_wrap(~country)
+```
+
+
+```{r include = FALSE}
+# seedlings and saplings
+facet_order <- c("seedling", "sapling", "tree", "dead")
+  
+tree_data %>% #keep for later
+  #filter(class == 'sapling') %>%
+  mutate(class = factor(class, levels = facet_order)) %>% 
+  ggplot(aes(distance, color = country, fill = country)) + 
+  geom_histogram(alpha = 0.5, 
+                position="identity") +
+  geom_vline(aes(xintercept = 0), linetype = 'dashed') +
+  facet_wrap(~class)
+```
+
+**numbers of trees**
+
+```{r echo = FALSE}
+facet_order <- c("seedling", "sapling", "tree", "dead")
+
+tree_transect_data_full %>%
+  mutate(class = factor(class, levels = facet_order)) %>% 
+  ggplot(aes(section, n, color = country)) + 
+  geom_boxplot() +
+  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75)) +
+  theme_classic() +
+  facet_grid(~class)
+```
+
+The models (GLMMs) below model numbers of individuals against "Country" and "Habitat" (called "section" in the data set). To reduce the complexity of the model and since I am not interested in relationships between tree classes, I ran this model over subsets containing data for each tree class separately (i.e., seedling, sapling, adult tree, or dead tree). This data set includes 0 when no individuals of said classes were found in a given section of the transects. 
+
+**Seedlings**
+```{r}
+# seedlings
+d <- tree_transect_data_full %>% 
+  filter(class == "seedling") 
+
+fit <- glmer(n ~ country * section + (country | transect) + (1 | section), family = poisson, data = d) 
+summary(fit)
+
+lsmeans(fit, pairwise ~ country*section, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```
+•	Higher numbers of seedlings were only found in the forest in Norway in comparison to the forest in Finland (p = 0.0391). Slightly higher numbers of seedlings were found in the Norwegian treeline compared to the Finnish treeline, although this finding lacks statistical support (p = 0.0561).
+
+**Saplings**
+```{r}
+# saplings
+d <- tree_transect_data_full %>% 
+  filter(class == "sapling") 
+
+fit <- glmer(n ~ country * section + (country | transect) + (1 | section), family = poisson, data = d) 
+summary(fit)
+
+lsmeans(fit, pairwise ~ country*section, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```
+•	Sapling numbers were consistently higher in Norway in all habitats (forest, p < 0.0001; treeline, p = 0.0002; tundra, p = 0.0137) when compared to Finland, suggesting that intense grazing regimes limit recruitment in Finland. 
+
+**Adult trees**
+```{r}
+# adult trees
+d <- tree_transect_data_full %>%  
+  filter(class == "tree") 
+
+fit <- glmer(n ~ country * section + (country | transect) + (1 | section), family = poisson, data = d) 
+summary(fit)
+```
+
+**Dead trees**
+```{r}
+# dead
+d <- tree_transect_data_full %>% 
+  filter(class == "dead") 
+
+fit <- glmer(n ~ country * section + (country | transect) + (1 | section), family = poisson, data = d) 
+summary(fit)
+```
+**Relationship between trees and dung counts**
+
+```{r echo = FALSE}
+facet_order <- c("seedling", "sapling", "tree", "dead")
+
+tree_transect_data_full %>% 
+  rename(habitat = section) %>% 
+  inner_join(transect_data) %>%  
+  mutate(class = factor(class, levels = facet_order)) %>% 
+  ggplot(aes(x = total_dung, y = n, color = country)) +
+  geom_point() +
+  facet_wrap(~ class)
+```
+
+```{r}
+fit <- tree_transect_data_full %>% 
+  rename(habitat = section) %>% 
+  inner_join(transect_data) %>%  
+  filter(class == "seedling") %>% 
+  glmer(n ~ total_dung + (country | transect) + (1  | habitat), family = poisson, data = .) 
+
+summary(fit)
+anova(fit)
+```
+```{r}
+fit <- tree_transect_data_full %>% 
+  rename(habitat = section) %>% 
+  inner_join(transect_data) %>%  
+  filter(class == "sapling") %>% 
+  glmer(n ~ total_dung + (country | transect) + (1  | habitat), family = poisson, data = .) 
+
+summary(fit)
+anova(fit)
+```
+
+•	This is corroborated by the significant negative relationship between dung counts and numbers of seedlings (GLMM, F1 = 6.03, p = 0.0146) and saplings (GLMM, F1 = 16.34, p < 0.0001) found in the transects. 
+
+```{r include = FALSE}
+fit <- tree_transect_data_full %>% 
+  rename(habitat = section) %>% 
+  inner_join(transect_data) %>%  
+  filter(class == "sapling") %>% 
+  glmer(n ~ slope + (country | transect) + (1  | habitat), family = poisson, data = .) 
+
+summary(fit)
+anova(fit)
+```
+```{r}
+tree_transect_data_full %>% 
+  rename(habitat = section) %>% 
+  inner_join(transect_data) %>%  
+  ggplot(aes(x = aspect, y = total_dung, color = country)) +
+  geom_point()
+
+fit <- transect_data %>% 
+  lmer(aspect ~ country + (country | transect) + (1  | habitat), data = .) 
+summary(fit)
+anova(fit)
+```
+
+## Adult tree morphology
+**numbers of stems**
+```{r}
+tree_data %>%
+  na.omit() %>%
+  ggplot(aes(class, n_stems, color = country)) + 
+  geom_boxplot() +
+  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75)) +
+  theme_classic() 
+```
+
+```{r}
+fit <- tree_transect_data %>% 
+  rename(habitat = section) %>% 
+  full_join(transect_data) %>%  
+  filter(class != "dead") %>% 
+  lmer(mean_n_stems ~ country * class + (country | transect) + (1 | habitat), data = .) 
+
+summary(fit)
+anova(fit)
+lsmeans(fit, pairwise ~ country * class, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```
+
+**height and diameter**
+```{r}
+tree_data %>%
+  filter(class == 'tree') %>%
+  ggplot(aes(country, height, color = country)) + 
+  geom_boxplot() 
+```
+
+**height to diameter ratio**
+adult trees
+```{r}
+tree_data %>%
+  filter(class == 'tree') %>%
+  ggplot(aes(height, diameter, color = country)) + 
+  geom_point() 
+```
+
+adult trees (per transect)
+```{r}
+tree_data %>%
+  filter(class == 'tree') %>%
+  ggplot(aes(height, diameter, color = country)) + 
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  facet_wrap(~transect)
+```
+
+saplings
+```{r}
+tree_data %>%
+  filter(class == 'sapling') %>%
+  ggplot(aes(height, diameter, color = country)) + 
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+saplings (per transect)
+```{r}
+tree_data %>%
+  filter(class == 'sapling') %>%
+  ggplot(aes(height, diameter, color = country)) + 
+  geom_point() +
+  #geom_smooth(method = 'lm') +
+  facet_wrap(~transect)
+```
+
+seedlings
+```{r}
+tree_data %>%
+  filter(class == 'seedling') %>%
+  ggplot(aes(height, diameter, color = country)) + 
+  geom_point() #+
+  #geom_smooth(method = 'lm') +
+  #facet_wrap(~transect)
+```
+
+
+**growth form vs stem diameter**
+```{r}
+tree_data %>%
+  filter(class == 'tree') %>%
+  ggplot(aes(n_stems, diameter, color = country)) + 
+  geom_point() +
+  geom_smooth(method = 'lm') 
+```
+
+**trees along transect**
+```{r}
+tree_data %>%
+  ggplot(aes(distance, height, color = country)) + 
+  geom_point() +
+  geom_vline(aes(xintercept = 0), linetype = 'dashed') +
+  facet_wrap(~transect)
+```
+
+transect N8 in particular shows a more smooth transition from continuous forest to open tundra
+```{r}
+tree_data %>%
+  filter(transect == 'N8') %>%
+  ggplot(aes(distance, height)) + 
+  geom_point() +
+  geom_vline(aes(xintercept = 0), linetype = 'dashed')
+```
+
+**numbers of stems**
+```{r}
+tree_data %>%
+  filter(class == 'tree') %>%
+  ggplot(aes(n_stems, color = country, fill = country)) + 
+  geom_histogram(alpha = 0.5, 
+                position="identity") +
+  facet_wrap(~country)
+```

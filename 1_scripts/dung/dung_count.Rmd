@@ -11,15 +11,13 @@ knitr::opts_chunk$set(error = TRUE)
 ```
 
 ```{r include = FALSE} 
-setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling") 
-
 require(tidyr)
 require(dplyr)
 ```
 
 # Raw data
 ```{r echo = FALSE}
-data_raw <- readr::read_csv("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/2_input/dung_count_data_raw.csv")
+data_raw <- readr::read_csv("../../2_input/1_raw_data/dung_count_data_raw.csv")
 
 data_raw %>% head(10)
 ```
@@ -41,7 +39,7 @@ dung_counts %>% head(15)
 **country**
 ```{r}
 dung_counts <- dung_counts %>% 
-  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Storfjord', 'Malla'))) %>%
   select(transect, country, everything())
 
 dung_counts %>% head(10)
@@ -60,7 +58,7 @@ dung_counts %>% head(10)
 
 ```{r include=FALSE}
 dung_counts %>%
-  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/dung_count_data.csv')
+  readr::write_csv('../../3_output/1_data_products/dung_count_data.csv')
 ```
 
 # Summarise data by transect
@@ -78,7 +76,7 @@ dung_data_transect_summary <- dung_groups %>%
   replace_na(list(frequency = 0))
 
 dung_data_transect_summary <- dung_data_transect_summary %>% 
-  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Storfjord', 'Malla'))) %>%
   select(transect, country, everything())
 
 dung_data_transect_summary%>%
@@ -87,7 +85,7 @@ dung_data_transect_summary%>%
 
 ```{r include=FALSE}
 dung_data_transect_summary %>%
-  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/dung_data_transect_summary.csv')
+  readr::write_csv('../../3_output/1_data_products/dung_data_transect_summary.csv')
 ```
 
 # Summarise data by country
@@ -120,5 +118,5 @@ dung_data_country_summary %>%
 
 ```{r include=FALSE}
 dung_data_country_summary %>%
-  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/dung_data_country_summary.csv')
+  readr::write_csv('../../3_output/1_data_products/dung_data_country_summary.csv')
 ```

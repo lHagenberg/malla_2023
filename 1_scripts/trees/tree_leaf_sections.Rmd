@@ -20,12 +20,12 @@ require(dataDownloader)
 ```
 
 ```{r (down)load data}
-get_file(node = "3b2xy",
-         file = "tree_core_data_raw.xlsx",
-         path = "2_input/1_raw_data", 
-         remote_path = "raw_data") 
+#get_file(node = "3b2xy",
+#         file = "tree_core_data_raw.xlsx",
+#         path = "2_input/1_raw_data", 
+#         remote_path = "raw_data") 
 
-data_raw <- openxlsx::read.xlsx("2_input/1_raw_data/tree_core_data_raw.xlsx")
+data_raw <- openxlsx::read.xlsx("../../2_input/1_raw_data/tree_core_data_raw.xlsx")
 ```
 
 ```{r}
@@ -37,7 +37,7 @@ data$section <- as.numeric(data$section)
 data$leaves <- as.factor(data$leaves)
 
 data <- data %>% 
-  mutate(country = as.factor(ifelse(grepl('N', code), 'Norway', 'Finland'))) %>%
+  mutate(country = as.factor(ifelse(grepl('N', code), 'Storfjord', 'Malla'))) %>%
   select(code, country, section, leaves)
 ```
 

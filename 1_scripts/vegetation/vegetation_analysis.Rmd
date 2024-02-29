@@ -24,13 +24,13 @@ require(vegan)
 # Data import
 **vegetation data**
 ```{r echo = FALSE}
-vegetation_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/2_input/1_raw_data/vegetation_data_raw.csv')
+vegetation_data <- readr::read_csv('../../2_input/1_raw_data/vegetation_data_raw.csv')
 
 vegetation_data %>% head(10)
 ```
 **dung count data**
 ```{r}
-dung_data <- read.csv("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/dung_count_data.csv")
+dung_data <- read.csv("../../3_output/1_data_products/dung_count_data.csv")
 
 dung_data %>% 
   head(10)
@@ -38,7 +38,7 @@ dung_data %>%
 
 **meta data**
 ```{r echo = FALSE}
-meta_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/2_input/1_raw_data/plot_data_extended.csv')
+meta_data <- readr::read_csv('../../2_input/1_raw_data/plot_data_extended.csv')
 
 meta_data %>% head(10)
 ```

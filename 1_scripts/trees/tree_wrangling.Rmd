@@ -11,15 +11,13 @@ knitr::opts_chunk$set(error = TRUE)
 ```
 
 ```{r include = FALSE} 
-setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling") 
-
 require(tidyr)
 require(dplyr)
 ```
 
 # raw data
 ```{r echo = FALSE}
-data_raw <- readr::read_csv("~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/2_input/tree_data_raw.csv")
+data_raw <- readr::read_csv("../../2_input/1_raw_data/tree_data_raw.csv")
 
 data_raw %>% head(10)
 ```
@@ -28,7 +26,7 @@ data_raw %>% head(10)
 **country**
 ```{r}
 tree_data <- data_raw %>% 
-  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Storfjord', 'Malla'))) %>%
   select(transect, country, distance, height, diameter, n_stems)
 
 tree_data %>% head(10)
@@ -64,7 +62,7 @@ tree_data %>% head(10)
 
 ```{r include=FALSE}
 tree_data %>%
-  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/tree_data.csv')
+  readr::write_csv('../../3_output/1_data_products/tree_data.csv')
 ```
 
 # summarise data by transect
@@ -92,7 +90,7 @@ tree_data_transect_summary <- tree_groups %>%
   full_join(tree_data_transect_summary,.)
 
 tree_data_transect_summary <- tree_data_transect_summary %>% 
-  mutate(country = as.factor(ifelse(grepl('N', transect), 'Norway', 'Finland'))) %>%
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Storfjord', 'Malla'))) %>%
   select(transect, country, everything())
 
 tree_data_transect_summary%>%
@@ -101,7 +99,7 @@ tree_data_transect_summary%>%
 
 ```{r include=FALSE}
 tree_data_transect_summary %>%
-  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data.csv')
+  readr::write_csv('../../3_output/1_data_products/tree_transect_data.csv')
 ```
 
 ```{r}
@@ -120,7 +118,7 @@ tree_data_transect_summary <- full_join(tree_data_transect_summary, tree_grid) %
 
 ```{r include=FALSE}
 tree_data_transect_summary %>%
-  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data_full.csv')
+  readr::write_csv('../../3_output/1_data_products/tree_transect_data_full.csv')
 ```
 
 # summarise data by country
@@ -155,5 +153,5 @@ tree_data_country_summary%>%
 
 ```{r include=FALSE}
 tree_data_country_summary %>%
-  readr::write_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_data_wrangling/3_output/tree_data_country_summary.csv')
+  readr::write_csv('../../3_output/1_data_products/tree_data_country_summary.csv')
 ```

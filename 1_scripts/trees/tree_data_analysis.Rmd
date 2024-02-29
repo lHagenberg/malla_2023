@@ -11,8 +11,6 @@ knitr::opts_chunk$set(error = TRUE)
 ```
 
 ```{r include = FALSE} 
-setwd("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/") 
-
 require(kableExtra)
 
 require(tidyr)
@@ -30,7 +28,7 @@ require(flexplot)
 # Data
 **individual tree data**
 ```{r include = FALSE}
-tree_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis/2_input/tree_data.csv')
+tree_data <- readr::read_csv('../../3_output/1_data_products/tree_data.csv')
 ```
 
 ```{r echo = FALSE}
@@ -40,9 +38,9 @@ tree_data %>% head(10)
 **transect meta/environmental data**
 ```{r include = FALSE}
 # transect meta data
-transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/transect_data.csv')
+transect_data <- readr::read_csv('../../3_output/1_data_products/transect_data.csv')
 
-transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/dung_data_transect_summary.csv') %>% 
+transect_data <- readr::read_csv('../../3_output/1_data_products/dung_data_transect_summary.csv') %>% 
   select(-frequency) %>% 
   rename(habitat = section) %>% 
   full_join(transect_data)
@@ -55,7 +53,7 @@ transect_data %>% head(10)
 
 ```{r include = FALSE}
 # tree transect summary data
-tree_transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data.csv')
+tree_transect_data <- readr::read_csv('../../3_output/1_data_products/tree_transect_data.csv')
 ```
 
 ```{r include = FALSE}
@@ -64,7 +62,7 @@ tree_transect_data %>% head(10)
 
 **tree data summarized per transect**
 ```{r include = FALSE}
-tree_transect_data_full <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/1_data_products/tree_transect_data_full.csv')
+tree_transect_data_full <- readr::read_csv('../../3_output/1_data_products/tree_transect_data_full.csv')
 ```
 
 ```{r echo = FALSE}
@@ -74,6 +72,8 @@ tree_transect_data_full %>% head(10)
 # Analysis
 ```{r include = FALSE}
 #of trees in all size classes (e.g., seedlings, smaller than 50 cm; saplings, smaller than 2m; adult trees, taller than 2m)
+tree_data$country <- factor(tree_data$country, levels = c("Storfjord", "Malla"))
+
 tree_data %>%
   na.omit() %>%
   ggplot(aes(distance, color = country, fill = country)) + 
@@ -115,13 +115,23 @@ tree_data %>% #keep for later
 ```{r echo = FALSE}
 facet_order <- c("seedling", "sapling", "tree", "dead")
 
+tree_transect_data_full$country <- factor(tree_transect_data_full$country, levels = c("Storfjord", "Malla"))
+
 tree_transect_data_full %>%
   mutate(class = factor(class, levels = facet_order)) %>% 
-  ggplot(aes(section, n, color = country)) + 
+  filter(class != "dead" & class != "tree") %>%  
+  ggplot(aes(section, n, fill = country)) + 
   geom_boxplot() +
-  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75)) +
+  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) +
   theme_classic() +
-  facet_grid(~class)
+  facet_grid(~class, scales = "free", drop = TRUE) + 
+  labs(fill = "Grazing regime", x = "Section", y = "Count") +
+  scale_fill_discrete(labels = c("Winter", "Year-round")) +
+  theme(panel.spacing = unit(.0, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1),
+        axis.text.x = element_text(angle = 45, hjust = 1), 
+        )
 ```
 
 The models (GLMMs) below model numbers of individuals against "Country" and "Habitat" (called "section" in the data set). To reduce the complexity of the model and since I am not interested in relationships between tree classes, I ran this model over subsets containing data for each tree class separately (i.e., seedling, sapling, adult tree, or dead tree). This data set includes 0 when no individuals of said classes were found in a given section of the transects. 

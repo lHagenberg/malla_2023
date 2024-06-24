@@ -11,8 +11,6 @@ knitr::opts_chunk$set(error = TRUE)
 ```
 
 ```{r include = FALSE} 
-setwd("~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis") 
-
 require(tidyr)
 require(dplyr)
 require(ggplot2)
@@ -21,14 +19,18 @@ require(ggplot2)
 # Data
 **raw dung counts**
 ```{r echo = FALSE}
-dung_count <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis/2_input/dung_count_data.csv')
+dung_count <- readr::read_csv('../../2_input/2_data_products/dung_count_data.csv')
 
 dung_count %>% head(10)
 ```
 
 **transect summary data**
 ```{r echo = FALSE}
-dung_transect_data <- readr::read_csv('~/Project Green Arctic/2_malla/1_data/field_data/2_data_analysis/2_input/dung_data_transect_summary.csv')
+dung_transect_data <- readr::read_csv('../../2_input/2_data_products/dung_data_transect_summary.csv')
+
+dung_transect_data <- dung_transect_data %>% 
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Storfjord', 'Malla'))) %>%
+  select(transect, country, everything())
 
 dung_transect_data %>% head(10)
 ```
@@ -36,9 +38,22 @@ dung_transect_data %>% head(10)
 # Plotting
 **dung frequencies**
 ```{r}
+dung_transect_data$country <- factor(dung_transect_data$country, levels = c("Storfjord", "Malla"))
+
 dung_transect_data %>%
   ggplot(aes(section, frequency, fill = country)) + 
-  geom_boxplot() 
+  geom_boxplot() + 
+  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) +
+  theme_classic() +
+  labs(fill = "Grazing regime", x = "Habitat", y = "Dung count") +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
+  theme(panel.spacing = unit(.0, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1),
+        axis.text.x = element_text(angle = 45, hjust = 1), 
+        )
+
+ggsave("../../3_output/2_graphs/dung_counts.svg", height = 4, width = 3.5)
 ```
 **total dung found**
 ```{r}

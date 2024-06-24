@@ -1,0 +1,20 @@
+---
+title: "tree_rings"
+author: "Liyenne"
+date: "2024-02-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(MtreeRing)
+```
+
+```{r}
+MtreeRing::ring_app_launch()
+```
+
+

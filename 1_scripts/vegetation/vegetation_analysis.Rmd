@@ -17,6 +17,7 @@ require(tidyverse)
 require(tibble)
 
 require(ggplot2)
+require(ggordiplots)
 
 require(vegan)
 ```
@@ -39,8 +40,13 @@ dung_data %>%
 **meta data**
 ```{r echo = FALSE}
 meta_data <- readr::read_csv('../../2_input/1_raw_data/plot_data_extended.csv')
-
 meta_data %>% head(10)
+
+dnp <- readxl::read_excel("../../2_input/1_raw_data/DNP.xlsx") %>% 
+  select(code, NO3, NH4, PO4_corrected)
+
+meta_data <- meta_data %>% 
+  left_join(dnp, by = "code")
 ```
 
 The code below appends the sum of scats found in the 10 meters closes to each plot to the meta data
@@ -68,11 +74,23 @@ vegetation_data_l <- vegetation_data %>%
 vegetation_data_l %>% 
   head(10)
 
+vegetation_data_l$country <- factor(vegetation_data_l$country, levels = c("N", "F"))
+
 vegetation_data_l %>% 
+  filter(type == c("salix", "gram")) %>% 
 ggplot(aes(habitat, cover)) +
   geom_boxplot(aes(fill = country)) +
+    labs(fill = "Grazing regime") +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  facet_wrap(~ type)
+  facet_wrap(~ type) +
+  theme_classic() +
+  theme(panel.spacing = unit(.0, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave("../../3_output/2_graphs/veg_covers.svg", height = 3.5, width = 5)
 ```
 
 
@@ -89,7 +107,7 @@ vegetation_tbl %>%
 
 meta_data <- vegetation_tbl %>% # create meta data 
   mutate(country_habitat = paste0(country, habitat)) %>% 
-  select(country, habitat, country_habitat, dung_count, slope, aspect, twi)
+  select(country, habitat, country_habitat, dung_count, slope, aspect, twi, everything())
 ```
 
 ```{r include = FALSE}
@@ -175,16 +193,17 @@ nmds <- vegetation_data %>%
 
 ```{r }
 ef <- meta_data %>% 
-  select(-country_habitat) %>% 
-  envfit(nmds, .); ef
+  select(dung_count, slope, aspect, twi, NO3, NH4, PO4_corrected, country, habitat, transect) %>% 
+  envfit(nmds, ., na.rm = TRUE); ef
 ```
 
 **NMDS with environmental variables**
 ```{r echo = FALSE}
-ef_coord_cont = as.data.frame(scores(ef, "vectors")) * ordiArrowMul(ef) # map vectors in plot
-rownames(ef_coord_cont) <- c("dung", "slope", "aspect", "TWI") 
+ef_coord_cont <-  as.data.frame(scores(ef, "vectors")) * ordiArrowMul(ef) # map vectors in plot
+rownames(ef_coord_cont) <- c("dung", "slope", "aspect", "TWI", "nitrate", "ammonium", "phosphate") 
 
 ef_coord_cat = as.data.frame(scores(ef, "factors")) * ordiArrowMul(ef) # map factors in plot
+ef_coord_cat <- ef_coord_cat[1:6,]
 rownames(ef_coord_cat) <- c("Finland", "Norway", "forest", "treeline", "tundra", "high tundra")
 
 hull_data <- meta_nmds %>% # find convex hulls
@@ -194,7 +213,9 @@ hull_data <- meta_nmds %>% # find convex hulls
 
 ggplot() + 
   geom_point(data = meta_nmds, aes(x = NMDS1, y = NMDS2, shape = habitat, colour = country),size=3) + # add the point markers
-  geom_polygon(data=hull_data,aes(x=NMDS1,y=NMDS2, fill = country),alpha=0.30) +
+  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
+  geom_polygon(data = hull_data, aes(x = NMDS1, y = NMDS2, fill = country, color = country),alpha=0.30) + 
+  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
   geom_text(data=species_nmds,aes(x=NMDS1,y=NMDS2,label=label),alpha=0.5) +  # add the species labels
   #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
   coord_equal() +
@@ -202,14 +223,21 @@ ggplot() +
        data = ef_coord_cont, linewidth =1, alpha = 0.5, colour = "grey30") +
      geom_point(data = ef_coord_cat, aes(x = NMDS1, y = NMDS2), 
        shape = "diamond", size = 4, alpha = 0.6, colour = "navy") +
-     geom_text(data = ef_coord_cat, aes(x = NMDS1, y = NMDS2+0.04), 
+     geom_text(data = ef_coord_cat, aes(x = NMDS1, y = NMDS2+0.08), 
        label = row.names(ef_coord_cat), colour = "navy", fontface = "bold") + 
      geom_text(data = ef_coord_cont, aes(x = NMDS1, y = NMDS2), colour = "grey30", 
        fontface = "bold", label = row.names(ef_coord_cont)) + 
-  theme_bw() +
-  guides(color = guide_legend(override.aes = list(shape = NA)))
+  labs(fill = "Grazing regime", color = "Grazing regime", shape = "Habitat") +
+  theme_classic() +
+  guides(color = guide_legend(override.aes = list(shape = NA))) +
+  theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1))
 
-ggsave("~/Project Green Arctic/2_malla/1_data/field_data/1_malla_data_analysis/3_output/2_graphs/veg_nmds.svg")
+#ggsave("../../3_output/2_graphs/veg_nmds.svg", height = 5, width = 6)
+```
+
+```{r}
+gg_ordisurf(ord = nmds, env.var = meta_data$aspect, binwidth = 5)
 ```
 
 

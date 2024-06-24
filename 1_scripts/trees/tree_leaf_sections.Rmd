@@ -16,7 +16,7 @@ require(ggpubr)
 
 #install.packages("remotes")
 #remotes::install_github("Between-the-Fjords/dataDownloader")
-require(dataDownloader)
+#require(dataDownloader)
 ```
 
 ```{r (down)load data}
@@ -42,9 +42,24 @@ data <- data %>%
 ```
 
 ```{r}
+labs <- c("Year-round", "Winter")
+names(labs) <- c("Malla", "Storfjord")
+
 data %>%  
   filter(leaves == 1) %>% 
-  gghistogram(x = "section", color = "country", add_density = TRUE)
+  #ggplot(aes(x = section)) +
+  #geom_histogram() +
+  #facet_grid(rows = vars(country))
+  gghistogram(x = "section", color = "country", fill = "country", bins = 21) +
+  facet_grid(~ factor(country, levels=c('Storfjord', 'Malla')), labeller = labeller(country = labs)) +
+  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
+  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
+  theme(panel.spacing = unit(.0, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1), 
+        legend.position = "none")
+
+ggsave("../../3_output/2_graphs/leaf_sections.svg", height = 4, width = 5)
 ```
 
 

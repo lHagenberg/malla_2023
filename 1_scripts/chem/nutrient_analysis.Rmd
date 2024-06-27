@@ -9,7 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r load packages}
+```{r load packages, echo = FALSE}
+se <- function(x) sd(x)/sqrt(length(x))
+
 # wrangling
 require(readxl)
 require(tidyverse)
@@ -49,230 +51,210 @@ dnp <- read_excel("../../2_input/1_raw_data/chem/DNP.xlsx") %>%
 ### Soil 
 #### Carbon & Nitrogen
 ##### C/N ratio
-```{r soil C/N ratio boxplot}
+```{r soil C/N ratio boxplot, echo = FALSE}
 cn_soil %>% 
-  ggplot(aes(x = country, y = CN_ratio)) +
-  geom_boxplot() +
-  facet_wrap(~ habitat)
+  ggplot(aes(x = habitat, y = CN_ratio, fill = country)) +
+  geom_boxplot()
 ```
 
-```{r soil LMM C/N ratio}
+```{r soil LMM C/N ratio, echo = FALSE}
 dist <- fitdist(cn_soil$CN_ratio, "norm")
 plot(dist)
 
 fit <- lme(CN_ratio ~ country * habitat, random = ~ 1|transect_ID, data = cn_soil)
-summary(fit)
 anova(fit)
-AIC(fit)
+summary(fit)
 ```
 
 ##### % carbon
-```{r soil carbpm boxplot}
+```{r soil carbpm boxplot, echo = FALSE}
 cn_soil %>% 
-  ggplot(aes(x = country, y = wC)) +
-  geom_boxplot() +
-  facet_wrap(~ habitat)
+  ggplot(aes(x = habitat, y = wC, fill = country)) +
+  geom_boxplot()
 ```
 
-```{r soil LMM carbon}
+```{r soil LMM carbon, echo = FALSE}
 dist <- fitdist(cn_soil$wC, "norm")
 plot(dist)
 
 fit <- lme(wC ~ country * habitat, random = ~ 1|transect, data = cn_soil)
-summary(fit)
 anova(fit)
-AIC(fit)
+summary(fit)
 ```
 
 ##### % nitrogen
-```{r soil nitrogen boxplot}
+```{r soil nitrogen boxplot, echo = FALSE}
 cn_soil %>% 
-  ggplot(aes(x = country, y = wN)) +
-  geom_boxplot() +
-  facet_wrap(~ habitat)
+  ggplot(aes(x = habitat, y = wN, fill = country)) +
+  geom_boxplot()
 ```
 
-```{r soil LMM nitrogen}
+```{r soil LMM nitrogen, echo = FALSE}
 dist <- fitdist(cn_soil$wN, "norm")
 plot(dist)
 
 fit <- lme(wN ~ country * habitat, random = ~ 1|transect, data = cn_soil)
-summary(fit)
 anova(fit)
-AIC(fit)
+summary(fit)
 ```
 
 ##### delta15N
-```{r soil d15N boxplot}
+```{r soil d15N boxplot, echo = FALSE}
 cn_soil %>% 
-  ggplot(aes(x = country, y = d15N)) +
-  geom_boxplot() +
-  facet_wrap(~ habitat)
+  ggplot(aes(x = habitat, y = d15N, fill = country)) +
+  geom_boxplot() 
 ```
 
-```{r soil LMM d15N}
+```{r soil LMM d15N, echo = FALSE}
 dist <- fitdist(cn_soil$CN_ratio, "norm")
 plot(dist)
 
 fit <- lme(d15N ~ country * habitat, random = ~ 1|transect, data = cn_soil)
-summary(fit)
 anova(fit)
-AIC(fit)
+summary(fit)
 ```
 
-```{r}
+```{r, echo = FALSE}
 lsmeans(fit, pairwise ~ habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
 ```
 
 #### Mineralized nutrients
 ##### Phosphate (PO4)
-```{r}
+```{r, echo = FALSE}
 dnp %>% 
   na.omit() %>% 
-  ggplot(aes(x = country, y = PO4_corrected)) +
-  geom_boxplot() +
-  facet_wrap(~ Habitat)
+  ggplot(aes(x = Habitat, y = PO4_corrected, fill = country)) +
+  geom_boxplot() 
 ```
 
-```{r}
+```{r, echo = FALSE}
 dist <- fitdist(dnp$PO4_corrected, "lnorm")
 plot(dist)
 
 fit <- lme(log(PO4_corrected) ~ country * Habitat, random = ~ 1 | ID, data = dnp, na.action = na.omit) 
-summary(fit)
-AIC(fit)
 anova(fit)
+summary(fit)
 ```
 
-```{r}
+```{r, echo = FALSE}
 lsmeans(fit, pairwise ~ country*Habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
 ```
 
 ##### Ammonium (NH4)
-```{r}
+```{r, echo = FALSE}
 dnp %>% 
   na.omit() %>% 
-  ggplot(aes(x = country, y = NH4)) +
-  geom_boxplot() +
-  facet_wrap(~ Habitat)
+  ggplot(aes(x = Habitat, y = NH4, fill = country)) +
+  geom_boxplot()
 ```
 
-```{r}
+```{r, echo = FALSE}
 dist <- fitdist(dnp$NH4, "norm")
 plot(dist)
 
 fit <- lme(NH4 ~ country * Habitat, random = ~ 1 | ID, data = dnp, na.action = na.omit) 
-AIC(fit)
-summary(fit)
 anova(fit)
+summary(fit)
 ```
 
-```{r}
+```{r, echo = FALSE}
 lsmeans(fit, pairwise ~ Habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
 ```
 
 ##### Nitrate (NO3)
-```{r}
+```{r, echo = FALSE}
 dnp %>% 
   na.omit() %>% 
-  ggplot(aes(x = country, y = NO3)) +
-  geom_boxplot() +
-  facet_wrap(~ Habitat)
+  ggplot(aes(x = Habitat, y = NO3, fill = country)) +
+  geom_boxplot()
 ```
 
-```{r}
+```{r, echo = FALSE}
 dist <- fitdist(dnp$NO3, "lnorm")
 plot(dist)
 
 fit <- lme(log(NO3) ~ country * Habitat, random = ~ 1 | ID, data = dnp, na.action = na.omit) 
-AIC(fit)
-summary(fit)
 anova(fit)
+summary(fit)
 ```
 
 ### Tree leaves
 ##### C/N ratio
-```{r leaf C/N ratio boxplot}
+```{r leaf C/N ratio boxplot, echo = FALSE}
 cn_leaf %>% 
-  ggplot(aes(x = country, y = CN_ratio)) +
+  ggplot(aes(y = CN_ratio, fill = country)) +
   geom_boxplot()
 ```
 
-```{r leaf LMM C/N ratio}
+```{r leaf LMM C/N ratio, echo = FALSE}
 dist <- fitdist(cn_leaf$CN_ratio, "norm")
 plot(dist)
 
 fit <- lme(CN_ratio ~ country, random = ~ 1|transect_ID, data = cn_leaf)
-AIC(fit)
-summary(fit)
 anova(fit)
-
+summary(fit)
 ```
 ##### % carbon
-```{r leaf carbon boxplot}
+```{r leaf carbon boxplot, echo = FALSE}
 cn_leaf %>% 
-  ggplot(aes(x = country, y = wC)) +
+  ggplot(aes(fill = country, y = wC)) +
   geom_boxplot()
 ```
 
-```{r leaf LMM carbon}
+```{r leaf LMM carbon, echo = FALSE}
 dist <- fitdist(cn_leaf$wC, "norm")
 plot(dist)
 
 fit <- lme(wC ~ country, random = ~ 1|transect_ID, data = cn_leaf)
-AIC(fit)
-summary(fit)
 anova(fit)
+summary(fit)
 ```
 
 ##### delta13C
-```{r leaf d13C boxplot}
+```{r leaf d13C boxplot, echo = FALSE}
 cn_leaf %>% 
-  ggplot(aes(x = country, y = d13C)) +
+  ggplot(aes(fill = country, y = d13C)) +
   geom_boxplot()
 ```
 
-```{r leaf LMM d13C}
+```{r leaf LMM d13C, echo = FALSE}
 dist <- fitdist(cn_leaf$d13C, "norm")
 plot(dist)
 
 fit <- lme(d13C ~ country, random = ~ 1|transect_ID, data = cn_leaf)
-summary(fit)
-AIC(fit)
 anova(fit)
+summary(fit)
 ```
 
 ##### % nitrogen
-```{r leaf nitrogen boxplot}
+```{r leaf nitrogen boxplot, echo = FALSE}
 cn_leaf %>% 
-  ggplot(aes(x = country, y = wN)) +
+  ggplot(aes(fill = country, y = wN)) +
   geom_boxplot()
 ```
 
-```{r leaf LMM nitrogen}
+```{r leaf LMM nitrogen, echo = FALSE}
 dist <- fitdist(cn_leaf$wN, "norm")
 plot(dist)
 
 fit <- lme(wN ~ country, random = ~ 1|transect_ID, data = cn_leaf)
-summary(fit)
-AIC(fit)
 anova(fit)
+summary(fit)
 ```
 
 ##### delta15N
-```{r leaf d15N boxplot}
+```{r leaf d15N boxplot, echo = FALSE}
 cn_leaf %>% 
-  ggplot(aes(x = country, y = d15N)) +
+  ggplot(aes(fill = country, y = d15N)) +
   geom_boxplot()
 ```
 
-```{r leaf LMM d15N}
+```{r leaf LMM d15N, echo = FALSE}
 dist <- fitdist(cn_leaf$d15N, "norm")
 plot(dist)
 
 fit <- lme(d15N ~ country, random = ~ 1|transect_ID, data = cn_leaf)
-summary(fit)
-AIC(fit)
 anova(fit)
+summary(fit)
 ```
 

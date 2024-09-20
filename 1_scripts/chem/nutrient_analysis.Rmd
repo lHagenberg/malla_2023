@@ -23,7 +23,12 @@ require(ggplot2)
 require(fitdistrplus)
 require(lme4)
 require(nlme)
+
+require(DHARMa)
+require(easystats)
+
 require(lsmeans)
+require(emmeans)
 ```
 
 ```{r read data, echo = FALSE}
@@ -57,13 +62,31 @@ cn_soil %>%
   geom_boxplot()
 ```
 
-```{r soil LMM C/N ratio, echo = FALSE}
+```{r soil C/N ratio distribution, echo = FALSE}
 dist <- fitdist(cn_soil$CN_ratio, "norm")
 plot(dist)
+```
 
-fit <- lme(CN_ratio ~ country * habitat, random = ~ 1|transect_ID, data = cn_soil)
-anova(fit)
+```{r soil LMM C/N ratio, echo = FALSE}
+fit <- lmer(CN_ratio ~ country * habitat + (1|transect_ID), data = cn_soil) # 
+
 summary(fit)
+anova(fit)
+```
+
+```{r soil LMM C/N ratio model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(CN_ratio ~ country + habitat + (1|transect_ID), data = cn_soil)
+check_model(fit)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+```{r soil LMM C/N ratio pairwise, echo = FALSE}
+emmeans(fit, pairwise ~ country | habitat)$contrasts
 ```
 
 ##### % carbon
@@ -73,13 +96,54 @@ cn_soil %>%
   geom_boxplot()
 ```
 
-```{r soil LMM carbon, echo = FALSE}
+```{r soil LMM % carbon, echo = FALSE}
 dist <- fitdist(cn_soil$wC, "norm")
 plot(dist)
 
-fit <- lme(wC ~ country * habitat, random = ~ 1|transect, data = cn_soil)
-anova(fit)
+fit <- lmer(wC ~ country * habitat + (1|transect_ID), data = cn_soil)
+
 summary(fit)
+anova(fit)
+```
+
+```{r soil LMM % carbon model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(wC ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+##### delta13C
+```{r soil d13C boxplot, echo = FALSE}
+cn_soil %>% 
+  ggplot(aes(fill = country, x = habitat, y = d13C)) +
+  geom_boxplot()
+```
+
+```{r soil LMM delta 13C, echo = FALSE}
+dist <- fitdist(cn_soil$d13C, "norm")
+plot(dist)
+
+fit <- lmer(d13C ~ country * habitat + (1|transect_ID), data = cn_soil) 
+
+summary(fit)
+anova(fit)
+```
+```{r soil LMM delta 13C pairwise comparisons, echo = FALSE}
+emmeans(fit, pairwise ~ habitat)$contrasts
+```
+
+```{r soil LMM delta 13C model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d13C ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 
 ##### % nitrogen
@@ -93,9 +157,20 @@ cn_soil %>%
 dist <- fitdist(cn_soil$wN, "norm")
 plot(dist)
 
-fit <- lme(wN ~ country * habitat, random = ~ 1|transect, data = cn_soil)
-anova(fit)
+fit <- lmer(wN ~ country * habitat + (1|transect_ID), data = cn_soil)
+
 summary(fit)
+anova(fit)
+```
+
+```{r soil LMM % nitrogen model  diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(wN ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 
 ##### delta15N
@@ -106,38 +181,62 @@ cn_soil %>%
 ```
 
 ```{r soil LMM d15N, echo = FALSE}
-dist <- fitdist(cn_soil$CN_ratio, "norm")
+dist <- fitdist(cn_soil$d15N, "norm")
 plot(dist)
 
-fit <- lme(d15N ~ country * habitat, random = ~ 1|transect, data = cn_soil)
-anova(fit)
+fit <- lmer(d15N ~ country * habitat + (1|transect_ID), data = cn_soil)
+
 summary(fit)
+anova(fit)
 ```
 
-```{r, echo = FALSE}
+```{r soil LMM d15N pairwise comparisons, echo = FALSE}
 lsmeans(fit, pairwise ~ habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+```{r soil LMM d15N model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 
 #### Mineralized nutrients
 ##### Phosphate (PO4)
-```{r, echo = FALSE}
+```{r phosphate boxplot, echo = FALSE}
 dnp %>% 
   na.omit() %>% 
   ggplot(aes(x = Habitat, y = PO4_corrected, fill = country)) +
   geom_boxplot() 
 ```
 
-```{r, echo = FALSE}
+```{r phosphate LMMM, echo = FALSE}
 dist <- fitdist(dnp$PO4_corrected, "lnorm")
 plot(dist)
 
-fit <- lme(log(PO4_corrected) ~ country * Habitat, random = ~ 1 | ID, data = dnp, na.action = na.omit) 
-anova(fit)
+#fit <- lme(log(PO4_corrected) ~ country * Habitat, random = ~ 1 | ID, data =  #dnp, na.action = na.omit) 
+fit <- lmer(log(PO4_corrected) ~ country * Habitat + (1|ID), data = dnp, na.action = na.omit)
 summary(fit)
+anova(fit)
 ```
 
-```{r, echo = FALSE}
-lsmeans(fit, pairwise ~ country*Habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```{r phosphate LMM pairwise comparisons, echo = FALSE}
+emmeans(fit, pairwise ~ country | Habitat)$contrasts
+```
+
+```{r phosphate LMM model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(log(PO4_corrected) ~ country + Habitat + (1|ID), data = dnp, na.action = na.omit)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 
 ##### Ammonium (NH4)
@@ -148,17 +247,28 @@ dnp %>%
   geom_boxplot()
 ```
 
-```{r, echo = FALSE}
+```{r ammonium LMM, echo = FALSE}
 dist <- fitdist(dnp$NH4, "norm")
 plot(dist)
 
-fit <- lme(NH4 ~ country * Habitat, random = ~ 1 | ID, data = dnp, na.action = na.omit) 
-anova(fit)
+fit <- lmer(NH4 ~ country * Habitat + (1|ID), data = dnp, na.action = na.omit)
 summary(fit)
+anova(fit)
 ```
 
-```{r, echo = FALSE}
-lsmeans(fit, pairwise ~ Habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```{r ammonium LMM pairwise comparisons, echo = FALSE}
+emmeans(fit, pairwise ~ Habitat)$contrasts
+emmeans(fit, pairwise ~ country | Habitat)$contrasts
+```
+
+```{r ammonium LMM model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(NH4 ~ country + Habitat + (1|ID), data = dnp, na.action = na.omit)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 
 ##### Nitrate (NO3)
@@ -173,9 +283,18 @@ dnp %>%
 dist <- fitdist(dnp$NO3, "lnorm")
 plot(dist)
 
-fit <- lme(log(NO3) ~ country * Habitat, random = ~ 1 | ID, data = dnp, na.action = na.omit) 
-anova(fit)
+fit <- lmer(log(NO3) ~ country * Habitat + (1|ID), data = dnp, na.action = na.omit)
 summary(fit)
+anova(fit)
+```
+```{r soil LMM d15N diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(log(NO3) ~ country + Habitat + (1|ID), data = dnp, na.action = na.omit)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 
 ### Tree leaves
@@ -190,10 +309,17 @@ cn_leaf %>%
 dist <- fitdist(cn_leaf$CN_ratio, "norm")
 plot(dist)
 
-fit <- lme(CN_ratio ~ country, random = ~ 1|transect_ID, data = cn_leaf)
+fit <- lmer(CN_ratio ~ country + (1 | transect_ID), data = cn_leaf)
 anova(fit)
 summary(fit)
 ```
+
+```{r soil LMM d15N diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+```
+
 ##### % carbon
 ```{r leaf carbon boxplot, echo = FALSE}
 cn_leaf %>% 
@@ -205,9 +331,15 @@ cn_leaf %>%
 dist <- fitdist(cn_leaf$wC, "norm")
 plot(dist)
 
-fit <- lme(wC ~ country, random = ~ 1|transect_ID, data = cn_leaf)
+fit <- lmer(wC ~ country + (1 | transect_ID), data = cn_leaf)
 anova(fit)
 summary(fit)
+```
+
+```{r soil LMM d15N diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
 ```
 
 ##### delta13C
@@ -221,9 +353,15 @@ cn_leaf %>%
 dist <- fitdist(cn_leaf$d13C, "norm")
 plot(dist)
 
-fit <- lme(d13C ~ country, random = ~ 1|transect_ID, data = cn_leaf)
+fit <- lmer(d13C ~ country + (1 | transect_ID), data = cn_leaf)
 anova(fit)
 summary(fit)
+```
+
+```{r soil LMM d15N diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
 ```
 
 ##### % nitrogen
@@ -237,9 +375,15 @@ cn_leaf %>%
 dist <- fitdist(cn_leaf$wN, "norm")
 plot(dist)
 
-fit <- lme(wN ~ country, random = ~ 1|transect_ID, data = cn_leaf)
+fit <- lmer(wN ~ country + (1 | transect_ID), data = cn_leaf)
 anova(fit)
 summary(fit)
+```
+
+```{r soil LMM d15N diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
 ```
 
 ##### delta15N
@@ -253,8 +397,13 @@ cn_leaf %>%
 dist <- fitdist(cn_leaf$d15N, "norm")
 plot(dist)
 
-fit <- lme(d15N ~ country, random = ~ 1|transect_ID, data = cn_leaf)
+fit <- lmer(d15N ~ country + (1 | transect_ID), data = cn_leaf)
 anova(fit)
 summary(fit)
 ```
 
+```{r soil LMM d15N diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+```

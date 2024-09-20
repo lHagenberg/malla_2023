@@ -42,11 +42,17 @@ dung_data %>%
 meta_data <- readr::read_csv('../../2_input/1_raw_data/plot_data_extended.csv')
 meta_data %>% head(10)
 
-dnp <- readxl::read_excel("../../2_input/1_raw_data/DNP.xlsx") %>% 
+dnp <- readxl::read_excel("../../2_input/1_raw_data/chem/DNP.xlsx") %>% 
   select(code, NO3, NH4, PO4_corrected)
 
+soil_chem <- readr::read_csv("../../2_input/1_raw_data/chem/chem_malla_soil_leaves.csv") %>% 
+  filter(type == "soil") %>% 
+  select(Sample_ID, wN, d15N, wC, d13C, CN_ratio) %>% 
+  rename(code = Sample_ID)
+
 meta_data <- meta_data %>% 
-  left_join(dnp, by = "code")
+  left_join(dnp, by = "code") %>% 
+  left_join(soil_chem, by = "code")
 ```
 
 The code below appends the sum of scats found in the 10 meters closes to each plot to the meta data
@@ -193,14 +199,16 @@ nmds <- vegetation_data %>%
 
 ```{r }
 ef <- meta_data %>% 
-  select(dung_count, slope, aspect, twi, NO3, NH4, PO4_corrected, country, habitat, transect) %>% 
+  select(dung_count, slope, aspect, twi, NO3, NH4, PO4_corrected, wN:CN_ratio, country, habitat, transect) %>% 
   envfit(nmds, ., na.rm = TRUE); ef
 ```
 
 **NMDS with environmental variables**
 ```{r echo = FALSE}
 ef_coord_cont <-  as.data.frame(scores(ef, "vectors")) * ordiArrowMul(ef) # map vectors in plot
-rownames(ef_coord_cont) <- c("dung", "slope", "aspect", "TWI", "nitrate", "ammonium", "phosphate") 
+ef_coord_cont <- ef_coord_cont[!(row.names(ef_coord_cont) %in% c("slope", "wN", "wC")),]
+
+rownames(ef_coord_cont) <- c("dung", "aspect", "TWI", "nitrate", "ammonium", "phosphate", "dN15", "dC13", "C/N ratio") 
 
 ef_coord_cat = as.data.frame(scores(ef, "factors")) * ordiArrowMul(ef) # map factors in plot
 ef_coord_cat <- ef_coord_cat[1:6,]
@@ -233,11 +241,20 @@ ggplot() +
   theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1))
 
-#ggsave("../../3_output/2_graphs/veg_nmds.svg", height = 5, width = 6)
+ggsave("../../3_output/2_graphs/veg_nmds.svg", height = 5, width = 6)
 ```
 
 ```{r}
 gg_ordisurf(ord = nmds, env.var = meta_data$aspect, binwidth = 5)
 ```
+
+### type cover
+```{r}
+fit <- lmer(gram ~ country * habitat + (country | transect) + (1 | habitat), data = vegetation_data) 
+summary(fit)
+
+lsmeans(fit, pairwise ~ country * habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```
+ 
 
 

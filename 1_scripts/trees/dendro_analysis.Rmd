@@ -10,11 +10,108 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-require(MtreeRing)
+require(tidyverse)
+require(dplR)
+```
+### Finland
+```{r}
+fin_rwl <- read.rwl("../../2_input/1_raw_data/tree_cores/Malla_F_STRIPPED.fh")
+
+rwl.report(fin_rwl)
+
+plot(fin_rwl, plot.type="spag")
 ```
 
+#### cross dating 
 ```{r}
-MtreeRing::ring_app_launch()
+corr.rwl.seg(fin_rwl, seg.length = 10, pcrit = 0.05)
+```
+
+
+#### SSS as cutoff
+```{r}
+fin_rwi <- detrend(fin_rwl, method = "AgeDepSpline")
+fin_crn <- chron(fin_rwi)
+
+fin_ids <- autoread.ids(fin_rwl)
+sssThresh <- 0.8
+fin_SSS <- sss(fin_rwi, fin_ids)
+
+yrs <- time(fin_rwl)
+yrCutoff <- max(yrs[fin_SSS < sssThresh])
+
+ggplot() +
+  geom_rect(aes(ymin = -Inf, ymax = Inf, xmin = -Inf, xmax = yrCutoff),
+            fill = "darkred", alpha = 0.5) +
+  annotate(geom = "text", 
+           y = 1.5, x = -50, 
+           label = "SSS < 0.8")+
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_line(aes(x = yrs, y = fin_crn$std)) +
+  labs(x = "Year", y = "RWI") + theme_minimal()
+
+# create cutoff based on SSS
+fin_rwlSSS <- fin_rwl[fin_SSS > sssThresh,]
+fin_rwiSSS <- detrend(fin_rwlSSS, method="AgeDepSpl")
+
+fin_crnSSS <- chron(fin_rwiSSS)
+ggplot() +
+  geom_hline(yintercept = 1,linetype="dashed") +
+  geom_line(aes(x=time(fin_crnSSS),y=fin_crnSSS$std)) +
+  geom_line(aes(x=time(fin_crnSSS),
+                y=caps(fin_crnSSS$std,nyrs = 30)),
+            color="darkred") +
+  labs(x="Year",y="RWI") + theme_minimal()
+```
+
+### Norway
+```{r}
+nor_rwl <- read.rwl("../../2_input/1_raw_data/tree_cores/Malla_N_STRIPPED.fh")
+rwl.report(nor_rwl)
+
+plot(nor_rwl, plot.type="spag")
+```
+
+#### cross dating
+```{r}
+corr.rwl.seg(nor_rwl, seg.length = 10, pcrit = 0.05)
+```
+
+#### SSS as cutoff
+```{r}
+# detrend original series
+nor_rwi <- detrend(nor_rwl, method = "AgeDepSpline")
+nor_crn <- chron(nor_rwi)
+
+nor_ids <- autoread.ids(nor_rwl)
+sssThresh <- 0.85
+nor_SSS <- sss(nor_rwi, nor_ids)
+
+yrs <- time(nor_rwl)
+yrCutoff <- max(yrs[nor_SSS < sssThresh])
+
+ggplot() +
+  geom_rect(aes(ymin = -Inf, ymax = Inf, xmin = -Inf, xmax = yrCutoff),
+            fill = "darkred", alpha = 0.5) +
+  annotate(geom = "text", 
+           y = 1.5, x = -50, 
+           label = "SSS < 0.85")+
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_line(aes(x = yrs, y = nor_crn$std)) +
+  labs(x = "Year", y = "RWI") + theme_minimal()
+
+# create cutoff based on SSS
+nor_rwlSSS <- nor_rwl[nor_SSS > sssThresh,]
+nor_rwiSSS <- detrend(nor_rwlSSS, method = "AgeDepSpl")
+
+nor_crnSSS <- chron(nor_rwiSSS)
+ggplot() +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_line(aes(x = time(nor_crnSSS), y = nor_crnSSS$std)) +
+  geom_line(aes(x = time(nor_crnSSS),
+                y = caps(nor_crnSSS$std, nyrs = 30)),
+            color = "darkred") +
+  labs(x = "Year", y = "RWI") + theme_minimal()
 ```
 
 

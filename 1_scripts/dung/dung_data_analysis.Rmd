@@ -30,7 +30,7 @@ dung_transect_data <- readr::read_csv('../../2_input/2_data_products/dung_data_t
 
 dung_transect_data <- dung_transect_data %>% 
   mutate(country = as.factor(ifelse(grepl('N', transect), 'Storfjord', 'Malla'))) %>%
-  select(transect, country, everything())
+  dplyr::select(transect, country, everything())
 
 dung_transect_data %>% head(10)
 ```
@@ -53,7 +53,7 @@ dung_transect_data %>%
         axis.text.x = element_text(angle = 45, hjust = 1), 
         )
 
-ggsave("../../3_output/2_graphs/dung_counts.svg", height = 4, width = 3.5)
+ggsave("../../3_output/2_graphs/dung_counts.svg", height = 4, width = 2.85)
 ```
 **total dung found**
 ```{r}

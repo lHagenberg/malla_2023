@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r load packages, echo = FALSE}
+```{r load packages, include = FALSE}
 se <- function(x) sd(x)/sqrt(length(x))
 
 # wrangling
@@ -22,7 +22,7 @@ require(ggplot2)
 # analyzing
 require(fitdistrplus)
 require(lme4)
-require(nlme)
+require(lmerTest)
 
 require(DHARMa)
 require(easystats)
@@ -71,7 +71,7 @@ plot(dist)
 fit <- lmer(CN_ratio ~ country * habitat + (1|transect_ID), data = cn_soil) # 
 
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
 ```{r soil LMM C/N ratio model diagnostics}
@@ -86,7 +86,7 @@ plot(x); rm(x)
 ```
 
 ```{r soil LMM C/N ratio pairwise, echo = FALSE}
-emmeans(fit, pairwise ~ country | habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts #???
 ```
 
 ##### % carbon
@@ -103,7 +103,7 @@ plot(dist)
 fit <- lmer(wC ~ country * habitat + (1|transect_ID), data = cn_soil)
 
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
 ```{r soil LMM % carbon model diagnostics}
@@ -130,8 +130,9 @@ plot(dist)
 fit <- lmer(d13C ~ country * habitat + (1|transect_ID), data = cn_soil) 
 
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
+
 ```{r soil LMM delta 13C pairwise comparisons, echo = FALSE}
 emmeans(fit, pairwise ~ habitat)$contrasts
 ```
@@ -160,7 +161,7 @@ plot(dist)
 fit <- lmer(wN ~ country * habitat + (1|transect_ID), data = cn_soil)
 
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
 ```{r soil LMM % nitrogen model  diagnostics}
@@ -187,7 +188,7 @@ plot(dist)
 fit <- lmer(d15N ~ country * habitat + (1|transect_ID), data = cn_soil)
 
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
 ```{r soil LMM d15N pairwise comparisons, echo = FALSE}
@@ -222,10 +223,11 @@ plot(dist)
 #fit <- lme(log(PO4_corrected) ~ country * Habitat, random = ~ 1 | ID, data =  #dnp, na.action = na.omit) 
 fit <- lmer(log(PO4_corrected) ~ country * Habitat + (1|ID), data = dnp, na.action = na.omit)
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
 ```{r phosphate LMM pairwise comparisons, echo = FALSE}
+emmeans(fit, pairwise ~ Habitat)$contrasts
 emmeans(fit, pairwise ~ country | Habitat)$contrasts
 ```
 
@@ -240,7 +242,7 @@ plot(x); rm(x)
 ```
 
 ##### Ammonium (NH4)
-```{r, echo = FALSE}
+```{r ammonium boxplot, echo = FALSE}
 dnp %>% 
   na.omit() %>% 
   ggplot(aes(x = Habitat, y = NH4, fill = country)) +
@@ -253,7 +255,7 @@ plot(dist)
 
 fit <- lmer(NH4 ~ country * Habitat + (1|ID), data = dnp, na.action = na.omit)
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
 ```{r ammonium LMM pairwise comparisons, echo = FALSE}
@@ -285,7 +287,7 @@ plot(dist)
 
 fit <- lmer(log(NO3) ~ country * Habitat + (1|ID), data = dnp, na.action = na.omit)
 summary(fit)
-anova(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 ```{r soil LMM d15N diagnostics}
 simulationOutput <- simulateResiduals(fittedModel = fit)
@@ -310,11 +312,10 @@ dist <- fitdist(cn_leaf$CN_ratio, "norm")
 plot(dist)
 
 fit <- lmer(CN_ratio ~ country + (1 | transect_ID), data = cn_leaf)
-anova(fit)
-summary(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
-```{r soil LMM d15N diagnostics}
+```{r leaf LMM C/N ratio diagnostics}
 simulationOutput <- simulateResiduals(fittedModel = fit)
 plot(simulationOutput)
 testDispersion(simulationOutput); rm(simulationOutput)
@@ -332,11 +333,10 @@ dist <- fitdist(cn_leaf$wC, "norm")
 plot(dist)
 
 fit <- lmer(wC ~ country + (1 | transect_ID), data = cn_leaf)
-anova(fit)
-summary(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
-```{r soil LMM d15N diagnostics}
+```{r leaf LMM carbon model diagnostics}
 simulationOutput <- simulateResiduals(fittedModel = fit)
 plot(simulationOutput)
 testDispersion(simulationOutput); rm(simulationOutput)
@@ -354,11 +354,10 @@ dist <- fitdist(cn_leaf$d13C, "norm")
 plot(dist)
 
 fit <- lmer(d13C ~ country + (1 | transect_ID), data = cn_leaf)
-anova(fit)
-summary(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
-```{r soil LMM d15N diagnostics}
+```{r leaf LMM d13C model diagnostics}
 simulationOutput <- simulateResiduals(fittedModel = fit)
 plot(simulationOutput)
 testDispersion(simulationOutput); rm(simulationOutput)
@@ -376,11 +375,10 @@ dist <- fitdist(cn_leaf$wN, "norm")
 plot(dist)
 
 fit <- lmer(wN ~ country + (1 | transect_ID), data = cn_leaf)
-anova(fit)
-summary(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
-```{r soil LMM d15N diagnostics}
+```{r leaf LMM nitrogen model diagnostics}
 simulationOutput <- simulateResiduals(fittedModel = fit)
 plot(simulationOutput)
 testDispersion(simulationOutput); rm(simulationOutput)
@@ -398,11 +396,10 @@ dist <- fitdist(cn_leaf$d15N, "norm")
 plot(dist)
 
 fit <- lmer(d15N ~ country + (1 | transect_ID), data = cn_leaf)
-anova(fit)
-summary(fit)
+car::Anova(fit, test.statistic = "F")
 ```
 
-```{r soil LMM d15N diagnostics}
+```{r leaf LMM d15N model diagnostics}
 simulationOutput <- simulateResiduals(fittedModel = fit)
 plot(simulationOutput)
 testDispersion(simulationOutput); rm(simulationOutput)

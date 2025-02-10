@@ -12,8 +12,18 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 require(tidyverse)
 require(dplR)
+
+require(fitdistrplus)
+require(lme4)
+require(lmerTest)
+
+require(DHARMa)
+require(easystats)
+
+require(lsmeans)
+require(emmeans)
 ```
-### Finland
+### finland
 ```{r}
 fin_rwl <- read.rwl("../../2_input/1_raw_data/tree_cores/Malla_F_STRIPPED.fh")
 
@@ -24,17 +34,17 @@ plot(fin_rwl, plot.type="spag")
 
 #### cross dating 
 ```{r}
-corr.rwl.seg(fin_rwl, seg.length = 10, pcrit = 0.05)
+#corr.rwl.seg(fin_rwl, seg.length = 10, pcrit = 0.05)
 ```
 
 
 #### SSS as cutoff
 ```{r}
-fin_rwi <- detrend(fin_rwl, method = "AgeDepSpline")
+fin_rwi <- dplR::detrend(fin_rwl, method = "AgeDepSpline")
 fin_crn <- chron(fin_rwi)
 
 fin_ids <- autoread.ids(fin_rwl)
-sssThresh <- 0.8
+sssThresh <- 0.85
 fin_SSS <- sss(fin_rwi, fin_ids)
 
 yrs <- time(fin_rwl)
@@ -45,14 +55,14 @@ ggplot() +
             fill = "darkred", alpha = 0.5) +
   annotate(geom = "text", 
            y = 1.5, x = -50, 
-           label = "SSS < 0.8")+
+           label = "SSS < 0.85")+
   geom_hline(yintercept = 1, linetype = "dashed") +
   geom_line(aes(x = yrs, y = fin_crn$std)) +
   labs(x = "Year", y = "RWI") + theme_minimal()
 
 # create cutoff based on SSS
 fin_rwlSSS <- fin_rwl[fin_SSS > sssThresh,]
-fin_rwiSSS <- detrend(fin_rwlSSS, method="AgeDepSpl")
+fin_rwiSSS <- dplR::detrend(fin_rwlSSS, method="AgeDepSpl")
 
 fin_crnSSS <- chron(fin_rwiSSS)
 ggplot() +
@@ -80,7 +90,7 @@ corr.rwl.seg(nor_rwl, seg.length = 10, pcrit = 0.05)
 #### SSS as cutoff
 ```{r}
 # detrend original series
-nor_rwi <- detrend(nor_rwl, method = "AgeDepSpline")
+nor_rwi <- dplR::detrend(nor_rwl, method = "AgeDepSpline")
 nor_crn <- chron(nor_rwi)
 
 nor_ids <- autoread.ids(nor_rwl)
@@ -102,7 +112,7 @@ ggplot() +
 
 # create cutoff based on SSS
 nor_rwlSSS <- nor_rwl[nor_SSS > sssThresh,]
-nor_rwiSSS <- detrend(nor_rwlSSS, method = "AgeDepSpl")
+nor_rwiSSS <- dplR::detrend(nor_rwlSSS, method = "AgeDepSpl")
 
 nor_crnSSS <- chron(nor_rwiSSS)
 ggplot() +
@@ -114,4 +124,94 @@ ggplot() +
   labs(x = "Year", y = "RWI") + theme_minimal()
 ```
 
+# mean ring width
+```{r}
+fin_rwi$year <- as.numeric(row.names(fin_rwi))
+fin_rwi <- fin_rwi[order(fin_rwi$year, decreasing = T), ] %>% 
+  dplyr::select(-year)
 
+fin_age <- apply(fin_rwi, MARGIN = 2, FUN = function(x) sum(!is.na(x)))
+
+fin_last <- fin_rwi[c(1:20), ]
+fin_meanRW <- colMeans(fin_last)
+```
+
+```{r}
+nor_rwi$year <- as.numeric(row.names(nor_rwi))
+nor_rwi <- nor_rwi[order(nor_rwi$year, decreasing = T), ] %>% 
+  dplyr::select(-year)
+
+nor_age <- apply(nor_rwi, MARGIN = 2, FUN = function(x) sum(!is.na(x)))
+
+
+nor_last <- nor_rwi[c(1:20), ]
+nor_meanRW <- colMeans(nor_last)
+```
+
+```{r create dataframe for ring width model}
+meanRWs <- data.frame(t(nor_meanRW)) %>% 
+  pivot_longer(everything(), names_to = "code", values_to = "mean_rw")
+
+meanRWs <- data.frame(t(fin_meanRW)) %>% 
+  pivot_longer(everything(), names_to = "code", values_to = "mean_rw") %>% 
+  rbind(meanRWs) %>% 
+  mutate(country = as.factor(ifelse(grepl('N', code), 'Norway', 'Finland')))
+
+# tree age
+tree_ages <- data.frame(t(nor_age)) %>% 
+  pivot_longer(everything(), names_to = "code", values_to = "age")
+
+tree_ages <- data.frame(t(fin_age)) %>% 
+  pivot_longer(everything(), names_to = "code", values_to = "age") %>% 
+  rbind(tree_ages) 
+
+# merge data 
+meanRWs <- left_join(meanRWs, tree_ages) 
+
+# add transect to the dataframe as a factor
+extrTransect <- function(code) { # function to extract transect from tree core code
+  stringr::str_sub(code, 1, -2)
+} 
+
+transect <- as.vector(sapply(meanRWs$code, FUN = extrTransect )) 
+
+meanRWs <- meanRWs %>% 
+  mutate(transect = transect) 
+meanRWs$transect <- as.factor(meanRWs$transect)
+```
+
+```{r plot mean ring width}
+meanRWs %>% 
+  ggplot(aes(x = country, y = mean_rw, fill = country)) +
+  geom_boxplot()
+```
+
+## mean ring width analysis
+```{mean ring width distribution, echo = FALSE}
+dist <- fitdist(meanRWs$mean_rw, "norm")
+plot(dist)
+
+hist(meanRWs$mean_rw)
+```
+
+```{r mean ring width LM, echo = FALSE}
+fit <- lmer(log(mean_rw) ~ country + (1 | transect), data = meanRWs) 
+# next step: add tree age as a covariat to the model 
+
+summary(fit)
+anova(fit)
+car::Anova(fit)
+```
+
+```{r mean ring width LM model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+```{r soil LMM C/N ratio pairwise, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+```

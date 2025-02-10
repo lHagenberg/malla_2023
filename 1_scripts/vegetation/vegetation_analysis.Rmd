@@ -20,6 +20,12 @@ require(ggplot2)
 require(ggordiplots)
 
 require(vegan)
+require(lme4)
+require(glmmTMB)
+```
+
+```{r}
+SE <- function(x) sd(x)/sqrt(length(x))
 ```
 
 # Data import
@@ -43,11 +49,11 @@ meta_data <- readr::read_csv('../../2_input/1_raw_data/plot_data_extended.csv')
 meta_data %>% head(10)
 
 dnp <- readxl::read_excel("../../2_input/1_raw_data/chem/DNP.xlsx") %>% 
-  select(code, NO3, NH4, PO4_corrected)
+  dplyr::select(code, NO3, NH4, PO4_corrected)
 
 soil_chem <- readr::read_csv("../../2_input/1_raw_data/chem/chem_malla_soil_leaves.csv") %>% 
   filter(type == "soil") %>% 
-  select(Sample_ID, wN, d15N, wC, d13C, CN_ratio) %>% 
+  dplyr::select(Sample_ID, wN, d15N, wC, d13C, CN_ratio) %>% 
   rename(code = Sample_ID)
 
 meta_data <- meta_data %>% 
@@ -69,7 +75,7 @@ vegetation_data <- dung_data %>%
   group_by(transect, habitat) %>% 
   summarise(dung_count = sum(count)) %>% 
   inner_join(vegetation_data, ., by = join_by(transect, habitat)) %>% 
-  select(code:habitat, dung_count, everything())
+  dplyr::select(code:habitat, dung_count, everything())
   
 ```
 
@@ -100,7 +106,7 @@ ggsave("../../3_output/2_graphs/veg_covers.svg", height = 3.5, width = 5)
 ```
 
 
-### NMDS
+# NMDS
 ```{r}
 vegetation_tbl <- vegetation_data %>% # add environmental variables
   full_join(meta_data) %>% 
@@ -194,6 +200,7 @@ nmds <- vegetation_data %>%
   select(code, salix:rock) %>% 
   column_to_rownames("code") %>% 
   metaMDS()
+
 ```
 
 
@@ -240,21 +247,399 @@ ggplot() +
   guides(color = guide_legend(override.aes = list(shape = NA))) +
   theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1))
-
-ggsave("../../3_output/2_graphs/veg_nmds.svg", height = 5, width = 6)
 ```
 
 ```{r}
 gg_ordisurf(ord = nmds, env.var = meta_data$aspect, binwidth = 5)
 ```
 
-### type cover
+# type cover
 ```{r}
-fit <- lmer(gram ~ country * habitat + (country | transect) + (1 | habitat), data = vegetation_data) 
-summary(fit)
+vegetation_data[, 7:18] <- (vegetation_data[, 7:18]/100)
+vegetation_data$country <- as.factor(vegetation_data$country)
+vegetation_data$habitat <- as.factor(vegetation_data$habitat)
+vegetation_data$transect <- as.factor(vegetation_data$transect)
+```
 
-lsmeans(fit, pairwise ~ country * habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```{r}
+vegetation_data %>% 
+  group_by(country) %>% 
+  summarise(msalix = mean(salix), salix_se = SE(salix), mgram = mean(gram), gram_se = SE(gram), mforb = mean(forb), forb_se = SE (forb), mbareGr = mean(bareGr), bareGr_se = SE(bareGr))
+```
+
+## graminoids
+```{r graminoid boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = gram, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r graminoid LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$gram, "beta")
+plot(dist)
+
+fit <- glmmTMB(gram ~ country * habitat + (1 | transect), 
+               dispformula = ~ country * habitat,
+               family = beta_family(), data = vegetation_data) 
+summary(fit)
+car::Anova(fit, type = "II")
+```
+
+```{r graminoid LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+```{r graminoid model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+```{r}
+vegetation_data %>% 
+  group_by(country) %>% 
+  summarise(mean(gram), SE(gram))
+```
+
+## forbs
+```{r forb boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = forb, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r forb LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$forb, "exp")
+plot(dist)
+
+fit <- glmmTMB(forb ~ country * habitat + (1 | transect), 
+               dispformula = ~ country * habitat,
+               family = beta_family(), ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit, type = "II")
+```
+
+```{r forb LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r forb model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
  
+## salix
+```{r salix boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = salix, fill = country)) +
+  geom_boxplot() 
+```
 
+```{r salix LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$salix, "exp")
+plot(dist)
 
+fit <- glmmTMB(salix ~ country * habitat + (1 | transect), 
+               family = beta_family(), ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit, type = "II")
+```
+
+```{r salix LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r salix model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## B. nana
+```{r B. nana boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = Bnana, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r B. nana LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$Bnana, "exp")
+plot(dist)
+
+fit <- vegetation_data %>% 
+  filter(habitat != "forest") %>% 
+  glmmTMB(Bnana ~ country * habitat + (1 | transect), 
+               dispformula = ~ country * habitat,
+               family = beta_family(), ziformula = ~1, 
+               data = .) 
+
+summary(fit)
+car::Anova(fit, type = "II")
+```
+
+```{r B. nana LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r B. nana model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput) 
+par(mfrow = c(1,2))
+plotResiduals(simulationOutput, vegetation_data$country)
+plotResiduals(simulationOutput, vegetation_data$habitat) # variation in the forest plots with respect to cover deviates from other groups
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## J. communis
+```{r J. communis boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = Jcomm, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r J. communis LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$Jcomm, "exp")
+plot(dist)
+
+fit <- glmmTMB(Jcomm ~ country * habitat + (1 | transect), 
+               family = beta_family(), ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit, type = "II")
+```
+
+```{r J. communis LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r J. communis model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## deciduous dwarf shrubs
+```{r deciduous dwarf shrub boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = dDwarf, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r deciduous dwarf shrub LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$dDwarf, "exp")
+plot(dist)
+
+fit <- glmmTMB(dDwarf ~ country * habitat + (1 | transect), 
+               family = beta_family(), ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit, type = "II")
+```
+
+```{r deciduous dwarf shrub LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r deciduous dwarf shrub model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## evergreen dwarf shrubs
+```{r evergreen dwarf shrub boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = eDwarf, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r evergreen dwarf shrub LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$eDwarf, "exp")
+plot(dist)
+
+fit <- glmmTMB(eDwarf ~ country * habitat + (1 | transect), 
+               family = beta_family(), ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit)
+```
+
+```{r evergreen dwarf shrub LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r evergreen dwarf shrub model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## bryophytes
+```{r bryophyte boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = bry, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r bryophyte LMMM, echo = FALSE}
+dist <- fitdist(log(vegetation_data$bry), "norm")
+plot(dist)
+
+fit <- glmmTMB(log(bry) ~ country * habitat + (1 | transect), 
+               dispformula = ~ country * habitat,
+               #family = beta_family(), 
+               ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit, type = "II")
+```
+
+```{r bryophyte LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r bryophyte model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plotResiduals(simulationOutput, vegetation_data$country) #heterogeneity of variance 
+plotResiduals(simulationOutput, vegetation_data$habitat)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## lichens
+```{r lichen boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = lich, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r lichen LMMM, echo = FALSE}
+dist <- fitdist(vegetation_data$lich, "exp")
+plot(dist)
+
+fit <- glmmTMB(lich ~ country * habitat, 
+               dispformula = ~ country * habitat,
+               family = beta_family(), ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit)
+```
+
+```{r lichen LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r lichen model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## bare grounds
+```{r bare ground boxplot, echo = FALSE}
+vegetation_data %>% 
+  na.omit() %>% 
+  ggplot(aes(x = habitat, y = bareGr, fill = country)) +
+  geom_boxplot() 
+```
+
+```{r bare ground LMMM, echo = FALSE}
+vegetation_data$bareGr[vegetation_data$bareGr == 0] <- 0.001
+  
+dist <- fitdist(vegetation_data$bareGr, "exp")
+plot(dist)
+
+fit <- glmmTMB(bareGr ~ country, 
+               family = beta_family(), ziformula = ~1, 
+               data = vegetation_data) 
+
+summary(fit)
+car::Anova(fit)
+```
+
+```{r bare ground LMMM, echo = FALSE}
+emmeans(fit, pairwise ~ country)$contrasts
+emmeans(fit, pairwise ~ habitat)$contrasts
+emmeans(fit, pairwise ~ country | habitat)$contrasts
+```
+
+```{r bare ground model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+fit <- lmer(d15N ~ country + habitat + (1|transect_ID), data = cn_soil)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```

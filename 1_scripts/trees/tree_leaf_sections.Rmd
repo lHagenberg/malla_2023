@@ -3,7 +3,11 @@ title: "tree_leaf_sections"
 author: "Liyenne"
 date: "2024-01-17"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
+
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -14,9 +18,20 @@ knitr::opts_chunk$set(error = TRUE)
 require(tidyverse)
 require(ggpubr)
 
+require(DHARMa)
+require(easystats)
+require(fitdistrplus)
+
+require(glmmTMB)
+require(emmeans)
+
 #install.packages("remotes")
 #remotes::install_github("Between-the-Fjords/dataDownloader")
 #require(dataDownloader)
+```
+
+```{r}
+SE <- function(x) sd(x)/sqrt(length(x))
 ```
 
 ```{r (down)load data}
@@ -30,7 +45,7 @@ data_raw <- openxlsx::read.xlsx("../../2_input/1_raw_data/tree_core_data_raw.xls
 
 ```{r}
 data <- data_raw %>% 
-  select(!distance:n_stems) %>% 
+  dplyr::select(!distance:n_stems) %>% 
   pivot_longer(!code, names_to = "section", values_to = "leaves")
 
 data$section <- as.numeric(data$section)
@@ -38,7 +53,7 @@ data$leaves <- as.factor(data$leaves)
 
 data <- data %>% 
   mutate(country = as.factor(ifelse(grepl('N', code), 'Storfjord', 'Malla'))) %>%
-  select(code, country, section, leaves)
+  dplyr::select(code, country, section, leaves)
 ```
 
 ```{r}
@@ -57,7 +72,8 @@ data %>%
   theme(panel.spacing = unit(.0, "lines"),
         panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1), 
-        legend.position = "none")
+        legend.position = "none") + 
+  coord_flip()
 
 ggsave("../../3_output/2_graphs/leaf_sections.svg", height = 4, width = 5)
 ```
@@ -69,5 +85,49 @@ data %>%
   ggdensity(x = "section", color = "country")
 ```
 
+# chi square on leaf presence
+```{r}
+data$leaves <- as.numeric(data$leaves) 
+x <- data
+x$leaves <- x$leaves - 1
+
+x <- x %>% 
+  group_by(code) %>% 
+  summarise(leaves_present = mean(leaves)) %>% 
+  mutate(country = as.factor(ifelse(grepl('N', code), 'N', 'F')))
+
+x <- x %>% 
+  filter(code != "N1A")
+
+boxplot(x$leaves_present ~ x$country)
+```
+
+```{r}
+x %>% 
+  group_by(country) %>% 
+  summarise(mean = mean(leaves_present), se = SE(leaves_present), n_trees = n())
 
 
+```
+
+```{r}
+dist <- fitdist(x$leaves_present, "beta")
+plot(dist)
+
+fit <- glm(data = x, leaves_present ~ country)
+car::Anova(fit, type = "II")
+
+report(fit)
+```
+
+```{r saplings model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_zeroinflation(fit)
+
+fit <- glmer.nb(n ~ country + section + (1 | transect), data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```

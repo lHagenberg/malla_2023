@@ -10,25 +10,39 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(error = TRUE)
 ```
 
+# setup
+## packages
 ```{r include = FALSE} 
 require(kableExtra)
 
+# data handling
 require(tidyr)
 require(dplyr)
 
+# modelling
 require(lme4)
 require(lmerTest)
-require(lsmeans)
+require(glmmTMB)
+require(pscl)
+
+require(emmeans)
+
+# model diagnostics
+require(DHARMa)
+require(easystats)
+require(fitdistrplus)
+
 require(MuMIn)
 require(AER)
 require(MASS)
 
+# plotting
 require(ggplot2)
 require(ggpubr)
 require(flexplot)
 ```
 
-# Data
+## loading data
 **individual tree data**
 ```{r include = FALSE}
 tree_data <- readr::read_csv('../../3_output/1_data_products/tree_data.csv')
@@ -44,7 +58,7 @@ tree_data %>% head(10)
 transect_data <- readr::read_csv('../../3_output/1_data_products/transect_data.csv')
 
 transect_data <- readr::read_csv('../../3_output/1_data_products/dung_data_transect_summary.csv') %>% 
-  select(-frequency) %>% 
+  #select(!frequency) %>% 
   rename(habitat = section) %>% 
   full_join(transect_data)
 transect_data %>% head(10)
@@ -69,30 +83,30 @@ tree_transect_data_full <- tree_transect_data_full %>%
 # Analysis
 ```{r include = FALSE}
 #of trees in all size classes (e.g., seedlings, smaller than 50 cm; saplings, smaller than 2m; adult trees, taller than 2m)
-tree_data$country <- factor(tree_data$country, levels = c("Storfjord", "Malla"))
+tree_data$country <- as.factor(tree_data$country)
 
 tree_data %>%
   na.omit() %>%
   ggplot(aes(distance, color = country, fill = country)) + 
   geom_histogram(alpha = 0.5, 
-                position="identity") +
+                position = "identity") +
   geom_vline(aes(xintercept = 0), linetype = 'dashed') +
-  facet_wrap(~country)
+  facet_wrap(~ country)
 ```
 
 
-```{r include = FALSE}
+```{r adult trees,  include = FALSE}
 #only adult trees (taller than 2m)
 tree_data %>%
   filter(class == 'tree') %>%
   ggplot(aes(distance, color = country, fill = country)) + 
   geom_histogram(alpha = 0.5, position="identity") +
   geom_vline(aes(xintercept = 0), linetype = 'dashed') +
-  facet_wrap(~country)
+  facet_wrap(~ country)
 ```
 
 
-```{r include = FALSE}
+```{r seedlings & saplings, include = FALSE}
 # seedlings and saplings
 facet_order <- c("seedling", "sapling", "tree", "dead")
   
@@ -107,7 +121,7 @@ tree_data %>% #keep for later
 ```
 
 **numbers of trees**
-```{r echo = FALSE}
+```{r boxplot of numbers of trees per class,echo = FALSE}
 facet_order <- c("seedling", "sapling", "tree", "dead")
 
 tree_transect_data_full$country <- factor(tree_transect_data_full$country, levels = c("Storfjord", "Malla"))
@@ -127,121 +141,218 @@ tree_transect_data_full %>%
         strip.background = element_rect(color = "black", size = 1),
         axis.text.x = element_text(angle = 45, hjust = 1))
 
-ggsave("../../3_output/2_graphs/seedling_counts.svg", height = 4, width = 5)
+ggsave("../../3_output/2_graphs/seedling_counts.svg", height = 4, width = 6)
 ```
 
 The models (GLMMs) below model numbers of individuals against "Country" and "Habitat" (called "section" in the data set). To reduce the complexity of the model and since I am not interested in relationships between tree classes, I ran this model over subsets containing data for each tree class separately (i.e., seedling, sapling, adult tree, or dead tree). This data set includes 0 when no individuals of said classes were found in a given section of the transects. 
 
-**Seedlings**
-```{r}
-# seedlings
+## number of individuals 
+### seedlings
+```{r seedling count distribution, echo = FALSE}
+d <- tree_transect_data_full %>% 
+  filter(class == "seedling") 
+dist <- fitdist(d$n, "nbinom")
+plot(dist)
+```
+
+```{r number of seedlings model}
 d <- tree_transect_data_full %>% 
   filter(class == "seedling") 
 
-#fit.a <- glm(n ~ country, family = poisson, data = d)
-#summary(fit.a)
-#anova(fit.a)
-#AIC(fit.a)
+# failed to converge
+fit <- glmer.nb(n ~ country * section + (1 | transect), data = d) 
+fit <- glm.nb(n ~ country * section, data = d); AIC(fit)
+fit <- glmmTMB(n ~ country * section + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = d) ; AIC(fit)
 
-#fit.b <- glmer(n ~ country + (1 | transect), family = poisson, data = d) 
-#summary(fit.b)
-#anova(fit.b)
-#AIC(fit.b)
-#r.squaredGLMM(fit.b)
-
-#fit.c <- glm.nb(n ~ country, data = d)
-#summary(fit.c)
-#anova(fit.c)
-#AIC(fit.c)
-
-#fit.d <- glmer.nb(n ~ country + (1 | transect), data = d) 
-#summary(fit.d)
-#anova(fit.d)
-#AIC(fit.d)
-#r.squaredGLMM(fit.d)
-
-#fit <- glmer(n ~ country * section + (1 | transect), family = poisson, data = d) 
-#summary(fit)
-#anova(fit)
-#AIC(fit)
-#r.squaredGLMM(fit)
-
-#fit1 <- glmer.nb(n ~ country * section + (1 | transect), data = d) 
-#summary(fit1)
-#anova(fit1)
-#AIC(fit1)
-#r.squaredGLMM(fit1)
-
-fit2 <- glm(n ~ country * section, family = poisson, data = d)
-summary(fit2)
-anova(fit2)
-AIC(fit2)
-dispersiontest(fit2)
-
-#fit3 <- glm.nb(n ~ country * section, data = d)
-#summary(fit3)
-#anova(fit3)
-#AIC(fit3)
+summary(fit)
+anova(fit)
+Anova(fit, type = "II")
 ```
 
-```{r}
-lsmeans(fit2, pairwise ~ country * section, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```{r seedling numbers pairwise comparisons}
+emmeans(fit, pairwise ~ country)
+emmeans(fit, pairwise ~ country | section)
 ```
-•	Higher numbers of seedlings were found in the forest (p = 0.0002) and the treeline (p = < 0.0001), but not in the tundra (p = 0.9405) in Norway in comparison to the forest in Finland . Slightly higher numbers of seedlings were found in the Norwegian treeline compared to the Finnish treeline, although this finding lacks statistical support (p = 0.0561).
 
-**Saplings**
-```{r}
-# saplings
+```{r seedlings model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_zeroinflation(fit)
+
+fit <- glmer.nb(n ~ country + section + (1 | transect), data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+### saplings
+```{r sapling count distribution, echo = FALSE}
+d <- tree_transect_data_full %>% 
+  filter(class == "sapling") 
+dist <- fitdist(d$n, "nbinom")
+plot(dist)
+```
+
+```{r sapling count model}
 d <- tree_transect_data_full %>% 
   filter(class == "sapling") 
 
-fit <- glmer(n ~ country * section + (1 | transect), family = poisson, data = d) 
+fit <- glmer.nb(n ~ country * section + (1 | transect), data = d); AIC(fit)
+fit <- glmmTMB(n ~ country * section + (1 | transect), 
+               family = nbinom2, ziformula = ~ 1, 
+               data = d) ; AIC(fit)
+
 summary(fit)
-anova(fit)
-AIC(fit)
-r.squaredGLMM(fit)
+Anova(fit, type = "II")
 ```
 
 ```{r}
-lsmeans(fit, pairwise ~ country * section, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+emmeans(fit, pairwise ~ country)
+emmeans(fit, pairwise ~ country | section)
 ```
 •	Sapling numbers were consistently higher in Norway in all habitats (forest, p < 0.0001; treeline, p = 0.0002; tundra, p = 0.0137) when compared to Finland, suggesting that intense grazing regimes limit recruitment in Finland. 
 
-**Adult trees**
-```{r}
-# adult trees
+```{r saplings model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_zeroinflation(fit)
+
+fit <- glmer.nb(n ~ country + section + (1 | transect), data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+### trees
+```{r tree count distribution, echo = FALSE}
+d <- tree_transect_data_full %>% 
+  filter(class == "tree") 
+dist <- fitdist(d$n, "nbinom")
+plot(dist)
+```
+
+```{r tree count model}
 d <- tree_transect_data_full %>%  
   filter(class == "tree") 
 
-fit <- glmer(n ~ country * section + (1 | transect), family = poisson, data = d) 
+fit <- glmer.nb(n ~ country * section + (1 | transect), data = d)# fails to converge
+fit <- glm.nb(n ~ country * section, data = d); AIC(fit)
+fit <- glmmTMB(n ~ country * section + (1 | transect), 
+               family = nbinom2, ziformula = ~ 1, 
+               data = d) ; AIC(fit)
+
 summary(fit)
-anova(fit)
-AIC(fit)
-r.squaredGLMM(fit)
+Anova(fit, type = "II")
 ```
 
-```{r}
-lsmeans(fit, pairwise ~ country * section, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+```{r tree count pairwise comparisons}
+emmeans(fit, pairwise ~ country | section)
+emmeans(fit, pairwise ~ section)
 ```
 
-**Dead trees**
+```{r tree model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_zeroinflation(fit)
+
+fit <- glm.nb(n ~ country + section, data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+### dead trees
+
+```{r tree count distribution}
+d <- tree_transect_data_full %>% 
+  filter(class == "dead") 
+dist <- fitdist(d$n, "nbinom")
+plot(dist)
+```
+
 ```{r}
 # dead
 d <- tree_transect_data_full %>% 
   filter(class == "dead") 
 
-fit <- glmer(n ~ country * section + (1 | transect), family = poisson, data = d) 
+fit <- glmer.nb(n ~ country * section + (1 | transect), data = d) # fails to converge
+fit <- glmmTMB(n ~ country * section + (1 | transect), 
+               family = nbinom2, ziformula = ~ 1, 
+               data = d) ; AIC(fit)
+fit <- glm.nb(n ~ country * section, data = d); AIC(fit)
+
+
+
 summary(fit)
-anova(fit)
-AIC(fit)
-r.squaredGLMM(fit)
+Anova(fit, type = "II")
+```
+
+```{r dead tree count pairwise comparisons}
+emmip(fit, country ~ section)
+
+emmeans(fit, pairwise ~ country, adjust = "tukey")
+emmeans(fit, pairwise ~ section, adjust = "tukey")
+emmeans(fit, pairwise ~ country|section, adjust = "tukey")
+```
+
+```{r dead tree model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_singularity(fit, tolerance = 1e-05)
+check_zeroinflation(fit)
+
+fit <- glmer.nb(n ~ country + section + (1 | transect), data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+## trees explained by other factors
+```{r}
+d <- tree_transect_data_full %>% 
+  filter(class == "dead") 
+
+fit <- glmmTMB(n ~ slope + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = d) ; AIC(fit)
+
+fit <- glmmTMB(n ~ aspect + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = d) ; AIC(fit)
+
+fit <- glmmTMB(n ~ twi + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = d) ; AIC(fit)
+
+Anova(fit, type = "II")
 ```
 
 ```{r}
-lsmeans(fit, pairwise ~ country * section, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+d <- tree_transect_data_full %>% 
+  filter(class == "sapling") 
+
+fit <- glmmTMB(n ~ twi + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = d) ; AIC(fit)
+
+fit <- glmmTMB(n ~ aspect + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = d) ; AIC(fit)
+
+fit <- glmmTMB(n ~ slope + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = d) ; AIC(fit)
+
+Anova(fit, type = "II")
 ```
 
-**Relationship between trees and dung counts**
+## trees/dung relationship
 
 ```{r echo = FALSE}
 facet_order <- c("seedling", "sapling", "tree", "dead")
@@ -260,10 +371,23 @@ fit <- tree_transect_data_full %>%
   rename(habitat = section) %>% 
   inner_join(transect_data) %>%  
   filter(class == "seedling") %>% 
-  glmer(n ~ total_dung + (1 | transect), family = poisson, data = .) 
+  glmer.nb(n ~ total_dung + (1 | transect), data = .) 
 
 summary(fit)
-anova(fit)
+Anova(fit)
+```
+
+```{r dead tree model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_singularity(fit, tolerance = 1e-05)
+check_zeroinflation(fit)
+
+fit <- glmer.nb(n ~ country + section + (1 | transect), data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 •	This is corroborated by the significant negative relationship between dung counts and numbers of seedlings (GLMM, F1 = 6.03, p = 0.0146) and saplings (GLMM, F1 = 16.34, p = 0.0009) found in the transects. 
 
@@ -272,21 +396,44 @@ fit <- tree_transect_data_full %>%
   rename(habitat = section) %>% 
   inner_join(transect_data) %>%  
   filter(class == "sapling") %>% 
-  glmer(n ~ total_dung + (1 | transect), family = poisson, data = .) 
+  glm.nb(n ~ total_dung, data = .) 
 
 summary(fit)
-anova(fit)
+Anova(fit)
+```
+```{r}
+fit <- tree_transect_data_full %>% 
+  rename(habitat = section) %>% 
+  inner_join(transect_data) %>%  
+  filter(class == "tree") %>% 
+  glm.nb(n ~ total_dung, data = .) 
+
+summary(fit)
+Anova(fit)
+```
+
+```{r tree/dung relationship model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_singularity(fit, tolerance = 1e-05)
+check_zeroinflation(fit)
+
+fit <- glmer.nb(n ~ country + section + (1 | transect), data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
 ```
 
 ```{r include = FALSE}
 fit <- tree_transect_data_full %>% 
   rename(habitat = section) %>% 
   inner_join(transect_data) %>%  
-  filter(class == "sapling") %>% 
-  glmer(n ~ slope  (1  | transect), family = poisson, data = .) 
+  filter(class == "tree") %>% 
+  glmer(n ~ slope + (1  | transect), family = poisson, data = .) 
 
 summary(fit)
-anova(fit)
+car::Anova(fit)
 ```
 
 ```{r}
@@ -297,9 +444,17 @@ tree_transect_data_full %>%
   geom_point()
 
 fit <- transect_data %>% 
-  lmer(aspect ~ country + (country | transect) + (1  | habitat), data = .) 
+  lmer(aspect ~ country + (1 | transect), data = .) 
 summary(fit)
-anova(fit)
+car::Anova(fit)
+```
+
+```{r}
+fit <- transect_data %>% 
+  glmer(total_dung ~ country * habitat + (1 | transect), family = poisson, data = .)
+car::Anova(fit)
+
+emmeans(fit, pairwise ~ country | habitat, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
 ```
 
 ## Adult tree morphology
@@ -325,11 +480,13 @@ fit <- tree_transect_data %>%
   rename(habitat = section) %>% 
   full_join(transect_data) %>%  
   filter(class != "dead") %>% 
-  lmer(mean_n_stems ~ country * class + (country | transect) + (1 | habitat), data = .) 
+  glmmTMB(mean_n_stems ~ country * class + (1 | transect), data = .) 
 
 summary(fit)
-anova(fit)
-lsmeans(fit, pairwise ~ country * class, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+car::Anova(fit)
+emmeans(fit, pairwise ~ country | class, lmer.df = "Satterthwaite", adjust = "tukey")$contrasts
+
+report(fit)
 ```
 
 **height and diameter**

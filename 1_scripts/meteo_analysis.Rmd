@@ -1,0 +1,45 @@
+---
+title: "meteo_analysis"
+author: "Liyenne"
+date: "2024-10-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(tidyverse)
+require(lubridate)
+```
+
+```{r}
+meteo_data <- read.csv("../2_input/1_raw_data/Enontekiö Kilpisjärvi_ 1.1.1990 - 2.1.2024_caaf4629-0cec-4ff7-8977-9d9558bb2c54.csv") %>% 
+  mutate(date = make_datetime(Year, Month, Day)) %>% 
+  mutate(Precipitation = as.numeric(Precipitation)) %>% 
+  na.omit()
+```
+
+```{r}
+meteo_data %>% 
+  group_by(Year) %>% 
+  summarize(mean_temp = mean(Average_temperature)) %>% 
+  filter(Year < 2024) %>% 
+  ggplot(aes(Year, mean_temp)) + 
+  geom_line()
+```
+
+```{r}
+x <- meteo_data %>% 
+  filter( Year > 1999 & Year < 2024) 
+
+mean(x$Average_temperature)
+  
+x <- meteo_data %>% 
+  group_by(Year) %>% 
+  summarize(tot_prec = sum(Precipitation)) %>% 
+  filter( Year > 1999 & Year < 2024) 
+mean(x$tot_prec)
+```
+

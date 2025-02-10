@@ -1,0 +1,498 @@
+---
+title: "multivariate_course"
+author: "Liyenne"
+date: "2024-10-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+# setup
+
+```{r load packages, include = FALSE}
+require(tidyverse)
+
+require(vegan)
+require(psych)
+require(rpart)
+
+require(ggplot2)
+```
+
+## data import
+
+```{r read data, include = FALSE}
+vegetation_data <- readr::read_csv('../../2_input/1_raw_data/vegetation_data_raw.csv')
+```
+
+The vegetation data consists of 12 ground cover types recorded for 80 sites:
+
+```{r show vegetation data, echo = FALSE}
+vegetation_data %>% 
+  select(code, salix:rock) %>% 
+  head(10)
+```
+
+```{r read meta data, include = FALSE}
+meta_data <- readr::read_csv('../../2_input/1_raw_data/plot_data_extended.csv')
+
+dnp <- readxl::read_excel("../../2_input/1_raw_data/chem/DNP.xlsx") %>% 
+  dplyr::select(code, NO3, NH4, PO4_corrected)
+
+soil_chem <- readr::read_csv("../../2_input/1_raw_data/chem/chem_malla_soil_leaves.csv") %>% 
+  filter(type == "soil") %>% 
+  dplyr::select(Sample_ID, wN, d15N, wC, d13C, CN_ratio) %>% 
+  rename(code = Sample_ID)
+
+meta_data <- meta_data %>% 
+  left_join(dnp, by = "code") %>% 
+  left_join(soil_chem, by = "code")
+```
+
+The environmental dataset contains 14 environmental as well as site information:
+
+```{r append meta data, echo = FALSE}
+# add dung counts to vegetation_data
+dung_data <- read.csv("../../3_output/1_data_products/dung_count_data.csv")
+
+vegetation_data <- dung_data %>% 
+  mutate(habitat = case_when(
+    distance <= -41 ~ "forest", 
+    distance >= -5 & distance <= 5 ~ "treeline", 
+    distance >= 45 & distance <= 54 ~ "tundra",
+    distance >= 91 ~ "upper_tundra"
+  )) %>% 
+  na.omit() %>% 
+  group_by(transect, habitat) %>% 
+  summarise(dung_count = sum(count)) %>% 
+  inner_join(vegetation_data, ., by = join_by(transect, habitat)) %>% 
+  dplyr::select(code:habitat, dung_count, everything())
+
+vegetation_tbl <- vegetation_data %>% # add environmental variables
+  full_join(meta_data) %>% 
+  select(code:habitat, dung_count, slope, aspect, twi, everything()) %>% 
+  column_to_rownames("code") 
+
+#vegetation_tbl %>% 
+#  as.data.frame() %>% 
+#  head(10)
+
+meta_data <- vegetation_tbl %>% # create meta data 
+  mutate(country_habitat = paste0(country, habitat)) %>% 
+  select(country, habitat, country_habitat, dung_count, slope, aspect, twi, everything())
+
+meta_data %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio) %>% 
+  head(10)
+```
+
+# DCA & CA
+
+run envfit on dca
+
+A DCA on the ground cover data shows a gradient length of 2.8. This indicates an intermediate gradient length, making the choice between methods for monotonic or non-monotonic data unclear. This is likely due to the fact that the "species" data was not actually collected at the resolution of actual species but rather functional groups. The data is originates from an semi-natural experimental setting in which no clear gradient is present, however it includes sampling points across the treeline ecotone. Therefore, I choose to continue with methods for non-monotonic data.
+
+```{r DCA, echo = FALSE}
+dca <- vegetation_data %>% 
+  select(salix:rock) %>% 
+  decorana(); dca
+
+plot(dca)
+```
+
+As I started out with a DCA, I also performed a CA to check whether the data shows an arch when not detrended. Plots scaled to both species and sites show a slight edge and arch effect.
+
+```{r echo = FALSE}
+CA <- vegetation_data %>% 
+  select(code, salix:rock) %>% 
+  column_to_rownames("code") %>% 
+  ca(); CA
+plot(CA, scaling = "sites")
+plot(CA, scaling = "species")
+summary(eigenvals(CA))
+```
+
+Where "species" or in this case ground cover types tend to end up relative to one another seems to be quite similar when comparing the CA and the DCA. Specifically, the fact that lichens and graminoids occupy oposite sides of the ordination space is striking as they generally respond to reindeer grazing in contrasting ways.
+
+# CCA
+
+## main effects
+
+```{r include = FALSE}
+x <-  meta_data %>% 
+  select(salix:rock) 
+  
+y <- meta_data %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+The of primary interest in this case is the effect of the grazing regime ("country" in the model) on the community composition, while the habitats in the ecotone are likely highly influential. Therefore, I formulated a CCA with grazing regime as the main environmental variable, while controlling for the effect of "habitat".
+
+A permutation test of the model shows that grazing regime significantly explains a proportion of the variation in the data when accounting for the effect of habitat. An anova on the model shows a similar result.
+```{r}
+main_cca <- cca(x ~ country + Condition(habitat), y)
+permutest(main_cca)
+```
+
+The proportion of variation in the data explained by the model only including the effect of interest (i.e., grazing regime) while controlling for habitat is 7.8%.
+```{r}
+summary(main_cca)
+```
+
+```{r echo = FALSE}
+ordiplot(main_cca)
+ordihull(
+  main_cca,
+  groups = y$country,
+  draw = "polygon",
+  col = "grey70",
+  label = T
+)
+```
+
+### grazing effect per habitat type
+
+To further explor how grazing regimes affect vegetation composition in different habitat type, I performed CCAs on subsets of the data.
+
+**Forest plots**
+
+```{r include = FALSE}
+a <-  meta_data %>% 
+  filter(habitat == "forest") %>% 
+  select(salix:rock) 
+  
+b <- meta_data %>% 
+  filter(habitat == "forest") %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+```{r}
+forest_cca <- cca(a ~ country, b)
+permutest(forest_cca)
+```
+
+```{r echo = FALSE}
+ordiplot(forest_cca)
+ordihull(
+  forest_cca,
+  groups = b$country,
+  draw = "polygon",
+  col = "grey70",
+  label = T
+)
+```
+
+**Treeline plots**
+
+```{r include = FALSE}
+a <-  meta_data %>% 
+  filter(habitat == "treeline") %>% 
+  select(salix:rock) 
+  
+b <- meta_data %>% 
+  filter(habitat == "treeline") %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+```{r}
+treeline_cca <- cca(a ~ country, b)
+permutest(treeline_cca)
+```
+
+```{r echo = FALSE}
+ordiplot(treeline_cca)
+ordihull(
+  treeline_cca,
+  groups = b$country,
+  draw = "polygon",
+  col = "grey70",
+  label = T
+)
+```
+
+**Tundra plots**
+
+```{r include = FALSE}
+a <-  meta_data %>% 
+  filter(habitat == "tundra") %>% 
+  select(salix:rock) 
+  
+b <- meta_data %>% 
+  filter(habitat == "tundra") %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+```{r}
+tundra_cca <- cca(a ~ country, b)
+permutest(tundra_cca)
+```
+
+```{r echo = FALSE}
+ordiplot(tundra_cca)
+ordihull(
+  tundra_cca,
+  groups = b$country,
+  draw = "polygon",
+  col = "grey70",
+  label = T
+)
+```
+
+**Upper tundra plots**
+
+```{r include = FALSE}
+a <-  meta_data %>% 
+  filter(habitat == "upper_tundra") %>% 
+  select(salix:rock) 
+  
+b <- meta_data %>% 
+  filter(habitat == "upper_tundra") %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+```{r echo = FALSE}
+upper_tundra_cca <- cca(a ~ country, b)
+permutest(upper_tundra_cca)
+```
+
+```{r echo = FALSE}
+ordiplot(upper_tundra_cca)
+ordihull(
+  upper_tundra_cca,
+  groups = b$country,
+  draw = "polygon",
+  col = "grey70",
+  label = T
+)
+```
+
+All subsets of the data appear to show clear differences between grazing regimes when only looking at isolated habitats, but the results of the CCA are never significant. I suspect that this is due to low sample sizes (i.e., 10 samples per grazing regime).
+
+## forward selection of factors
+
+```{r include = FALSE}
+x <-  meta_data %>% 
+  na.omit() %>% # removes data with missing values in the soil chemical composition variables
+  select(salix:rock) 
+  
+y <- meta_data %>% 
+  na.omit() %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+A full model including all environmental variables is still significantly explains the variation in the dataset with an adjusted R2 of 0.265.
+
+```{r echo = FALSE}
+full_cca <- cca(x ~ . , y); full_cca
+anova(full_cca)
+r2 <- RsquareAdj(full_cca)$adj.r.squared
+
+ordiplot(full_cca)  
+```
+
+Forward selection of variables results in the inclusion of 4 significant explanatory variables (i.e., habitat, C:N ratio, ammonium, and grazing regime). 
+
+```{r echo = FALSE}
+# A null model with only intercept, needed for the step wise selection
+null_cca <-
+  cca(x ~ 1, data = y) # model containing only species matrix and intercept
+
+# The step wise selection, based on R2
+sel_cca <-
+  ordiR2step(
+    null_cca,
+    scope = formula (full_cca),
+    R2scope = r2,
+    direction = 'forward',
+    permutations = 999
+  )
+sel_cca
+```
+
+```{r}
+sel_cca_adj <- sel_cca # get adjusted p values from the anova 
+sel_cca_adj$anova$`Pr(>F)` <- p.adjust(sel_cca$anova$`Pr(>F)`, method = 'holm', n = ncol(y)) 
+sel_cca_adj$anova
+
+ordiplot(sel_cca)
+```
+
+The factors in the model resulting from forward selection do not show colinearity
+
+```{r cca VIF, echo = FALSE}
+vif.cca(sel_cca)
+```
+
+# NMDS
+An NMDS on the data shows a stress of 0.21. This value is on the edge but still somwhat acceptable, I will thus continue with my interpretation of the data. 
+
+```{r echo = FALSE}
+nmds <- vegetation_data %>% 
+  select(code, salix:rock) %>% 
+  column_to_rownames("code") %>% 
+  metaMDS()
+
+stressplot(nmds) 
+```
+
+```{r include = FALSE}
+# multivariate (NMDS)
+  # scat counts around plots
+  # slope
+  # forest density (n trees)
+  # aspect
+  # soil data
+  # ndvi?
+
+
+veg_nmds <- vegetation_data %>% 
+  select(code, salix:rock) %>% 
+  column_to_rownames("code") %>% 
+  metaMDS() %>% 
+  scores(tidy = TRUE) %>%
+  as_tibble(ronames = "code")
+  
+species_nmds <- veg_nmds %>% 
+  filter(score == "species")
+
+veg_nmds <- veg_nmds %>% 
+  filter(score == "sites") %>% 
+  select(NMDS1, NMDS2)
+  
+meta_nmds <- cbind(meta_data, veg_nmds)
+```
+
+# PERMANOVA
+
+First, I use betadisper() to test whether the dispersions (variances) of groups are different. The output shows that group variation found among habitats (forest, treeline, tundra, upper tundra) under the two grazing regimes does not differ. Meaning that the outcome of a PERMANOVA will likely be reliable.
+
+```{r within group variance, warning = FALSE}
+vegetation_tbl %>% 
+  select(salix:rock) %>% 
+  as.dist() %>% 
+  betadisper(meta_data$country_habitat) %>% 
+  permutest()
+```
+
+A PERMANOVA using the "adonis2" function shows that a model including an interaction between grazing regime and habitat is significant. 
+
+```{r PEMANOVA, echo = FALSE}
+adonis2(as.matrix(vegetation_data[, 8:19]) ~ country * habitat, vegetation_data, permu = 999, method = "bray")
+```
+
+```{r include=FALSE}
+nmds <- vegetation_data %>% 
+  select(code, salix:rock) %>% 
+  column_to_rownames("code") %>% 
+  metaMDS()
+```
+
+- do holm correction on this output 
+- vif to see collinearity and select variables that way 
+```{r echo = FALSE}
+ef <- meta_data %>% 
+  select(dung_count, slope, aspect, twi, NO3, NH4, PO4_corrected, wN:CN_ratio, country, habitat, transect) %>% 
+  envfit(nmds, ., na.rm = TRUE); ef
+```
+
+**NMDS with environmental variables**
+
+```{r echo = FALSE}
+ef_coord_cont <-  as.data.frame(scores(ef, "vectors")) * ordiArrowMul(ef) # map vectors in plot
+ef_coord_cont <- ef_coord_cont[!(row.names(ef_coord_cont) %in% c("slope", "wN", "wC")),]
+
+rownames(ef_coord_cont) <- c("dung", "aspect", "TWI", "nitrate", "ammonium", "phosphate", "dN15", "dC13", "C/N ratio") 
+
+ef_coord_cat = as.data.frame(scores(ef, "factors")) * ordiArrowMul(ef) # map factors in plot
+ef_coord_cat <- ef_coord_cat[1:6,]
+rownames(ef_coord_cat) <- c("Finland", "Norway", "forest", "treeline", "tundra", "high tundra")
+
+hull_data <- meta_nmds %>% # find convex hulls
+  group_by(country) %>% # for each combination of country and habitat
+  arrange(NMDS1, NMDS2) %>%
+  slice(chull(NMDS1, NMDS2))
+
+ggplot() + 
+  geom_point(data = meta_nmds, aes(x = NMDS1, y = NMDS2, shape = habitat, colour = country),size=3) + # add the point markers
+  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
+  geom_polygon(data = hull_data, aes(x = NMDS1, y = NMDS2, fill = country, color = country),alpha=0.30) + 
+  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
+  geom_text(data=species_nmds,aes(x=NMDS1,y=NMDS2,label=label),alpha=0.5) +  # add the species labels
+  #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
+  coord_equal() +
+  geom_segment(aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2), 
+       data = ef_coord_cont, linewidth =1, alpha = 0.5, colour = "grey30") +
+     geom_point(data = ef_coord_cat, aes(x = NMDS1, y = NMDS2), 
+       shape = "diamond", size = 4, alpha = 0.6, colour = "navy") +
+     geom_text(data = ef_coord_cat, aes(x = NMDS1, y = NMDS2+0.08), 
+       label = row.names(ef_coord_cat), colour = "navy", fontface = "bold") + 
+     geom_text(data = ef_coord_cont, aes(x = NMDS1, y = NMDS2), colour = "grey30", 
+       fontface = "bold", label = row.names(ef_coord_cont)) + 
+  labs(fill = "Grazing regime", color = "Grazing regime", shape = "Habitat") +
+  theme_classic() +
+  guides(color = guide_legend(override.aes = list(shape = NA))) +
+  theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1))
+```
+
+# Regression tree
+
+Next performed a regression tree to figure out in which factors drive the differences between the two grazing regimes. I chose to exclude the aspect and slope factors from the tree model as this stems from the difference in topography between two adjacent areas, even thought the differences are consistent they are not major. the outcome shows that dung counts are the main destinguishing feature between the grazing regimes. Otherwise carbon isotopic composition plays a role. 
+
+```{r}
+pairs.panels(y[, -1], gap = 0, bg = c("red","blue")[y$country], pch = 21)
+
+tree.model <- rpart(country ~ dung_count + CN_ratio + NH4 + NO3 + d13C + d15N + PO4_corrected, data = y)
+
+plot(tree.model)
+text(tree.model)
+```
+
+# simple classification
+```{r include = FALSE}
+x <-  meta_data %>% 
+  select(salix:rock) 
+  
+y <- meta_data %>% 
+  select(country, habitat, country_habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+K-means clustering shows that there are 7 clusters in the dataset. The curve of the Calinski criterion seems odd as it shows that 2 groups has a higher value than 4. As I am interested to see if data will cluster according to grazing regime I will first proceed with 2 clusters. 
+```{r echo = TRUE}
+kk <- cascadeKM(x, inf.gr=2,sup.gr=15)
+plot(kk)
+```
+
+I tried fitting the data in 2 clusters which shows that the plots are distributed unequally between the clusters. And within each cluster an equal number of plots originating from each grazing regime. It is thus unlikely that grazing regime is a good clustering criterium. 
+```{r}
+fit <- kmeans(x, 2, nstart = 50) 
+
+#cluster sizes
+fit$size
+
+#compare clusters to grazing regimes
+table(fit$cluster, y$country)
+```
+
+Next, I tried clustering with 8 groups to see if clusters around the 4 different habitats under the two different grazing regimes would occur. If this would work perfectly, clusters should consist of 10 each as there were 10 transects in each grazing regime with 1 plot of each habitat type in each transect. However, plots seem to be somewhat randomly distributed over the clusters, showing that this combination of grazing regime and habitat does not the clustering that seems to naturally occur in the data. 
+```{r}
+fit <- kmeans(x, 8, nstart = 50) 
+
+#cluster sizes
+fit$size
+
+#compare clusters to grazing regimes
+table(fit$cluster, y$country_habitat)
+```
+
+The hopkins statistic (0.8) shows that this dataset does have a clear tendency to cluster, even if this is not according to the grouping variables in my dataset.
+```{r echo = FALSE, warning = FALSE}
+clustertend::hopkins(x, n = nrow(x)-1)
+```
+
+
+- discrimminate function analysis?
+- methods to make dendrograms using other distance matrices

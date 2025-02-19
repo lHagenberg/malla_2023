@@ -25,83 +25,9 @@ require(rstatix)
 require(vegan)
 ```
 
-# Manuscript
-## numbers of trees + dung counts
-```{r include = FALSE}
-# transect meta data
-transect_data <- readr::read_csv('../../3_output/1_data_products/transect_data.csv')
-
-transect_data <- readr::read_csv('../../3_output/1_data_products/dung_data_transect_summary.csv') %>% 
-  #select(!frequency) %>% 
-  rename(habitat = section) %>% 
-  full_join(transect_data)
-transect_data %>% head(10)
-```
-
-```{r echo = FALSE}
-tree_transect_data_full <- readr::read_csv('../../3_output/1_data_products/tree_transect_data_full.csv')
-tree_transect_data_full %>% head(10)
-
-tree_transect_data_full <- tree_transect_data_full %>% 
-  left_join(transect_data, by = c("transect" = "transect", "country" = "country", "section" = "habitat"))
-```
-
-```{r}
-anno <- t.test(
-  tree_transect_data_full[tree_transect_data_full$class == "seedling" & tree_transect_data_full$country == "Malla", "n"],
-  tree_transect_data_full[tree_transect_data_full$class == "seedling" & tree_transect_data_full$country == "Storfjord", "n"]
-)$p.value
-```
-
-
-```{r boxplot of numbers of trees per class,echo = FALSE}
-facet_order <- c("seedling", "sapling", "tree", "dead")
-
-tree_transect_data_full$country <- factor(tree_transect_data_full$country, levels = c("Storfjord", "Malla"))
-
-tree_transect_data_full$class <- factor(tree_transect_data_full$class, levels = c("seedling", "sapling", "tree", "dead"))
-
-# create label information for significance 
-sig <- distinct(tree_transect_data_full, class, section, country) %>% 
-  arrange(class, section, country) 
-
-#sig$y = c(20, 0, 6, 0, 5, 0, 40, 0, 24, 0, 14, 0, 16, 0, 42, 0, 20, 0, 50, 0, 9, 0, 12, 0)
-
-sig$y = c(16, 0, 42, 0, 20, 0, 40, 0, 24, 0, 14, 0, 50, 0, 9, 0, 12, 0, 20, 0, 6, 0, 5, 0)
-
-#sig$label = c("*", NA, "ns", NA, "ns", NA, "***", NA, "***", NA, "**", NA,"ns", NA, "ns", NA, "*", NA, "ns", NA, "ns", NA, "**", NA)
-
-sig$label = c("*", NA, "ns", NA, "ns", NA, "***", NA, "***", NA, "**", NA,"ns", NA, "ns", NA, "**", NA, "*", NA, "ns", NA, "ns", NA)
-
-#data.frame(
-#  class = c("seedling", "sapling", "tree", "dead"), 
-#  section = c("forest", "treeline", "tundra"),
-#  start = rep("D. f", 3),
-#  end = rep("D. p", 3),
-#  y = rep(1.05, 3),
-#  label = c("+", "+", "+")
-#) %>%
-#mutate(Behaviour = fct_relevel(class,
-#                                 "seedling", "sapling", "tree", "dead")); signif2
-
-p1 <- tree_transect_data_full %>%
-  mutate(class = factor(class, levels = facet_order)) %>% 
-  #filter(class != "dead" & class != "tree") %>%  
-  ggplot(aes(section, n, fill = country)) + 
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) + 
-  geom_text(data = sig, aes(y = y, label = label), 
-                  position = position_dodge(width = 0)) +
-  theme_classic() +
-  facet_grid(~class, scales = "free", drop = TRUE) + 
-  labs(fill = "Grazing regime", x = "Habitat", y = "Count") +
-  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme(panel.spacing = unit(.0, "lines"),
-        panel.border = element_rect(color = "black", fill = NA, size = 1), 
-        strip.background = element_rect(color = "black", size = 1),
-        axis.text.x = element_text(angle = 45, hjust = 1)); print(p1)
-```
-
+# Main text
+## Fig 2. grazing signs
+### Fig 2a dung counts
 ```{r echo = FALSE}
 dung_transect_data <- readr::read_csv('../../2_input/2_data_products/dung_data_transect_summary.csv')
 
@@ -123,37 +49,159 @@ sig$y = c(39, 0, 45, 0, 44, 0)
 sig$label = c("***", NA, "***", NA, "***", NA)
 
 
-p2 <- dung_transect_data %>%
+p1 <- dung_transect_data %>%
   ggplot(aes(section, frequency, fill = country)) + 
-  geom_boxplot() + 
-  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) +
+  geom_boxplot(outlier.shape = NA) + 
+  #geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) +
   geom_text(data = sig, aes(y = y, label = label), 
                   position = position_dodge(width = 0)) +
   theme_classic() +
-  labs(fill = "Grazing regime", x = "Habitat", y = "Dung count") +
-  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round"), guide = "none") +
+  labs(fill = "Reindeer density", x = "Habitat", y = "Dung count") +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
   theme(panel.spacing = unit(.0, "lines"),
         panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1),
-        axis.text.x = element_text(angle = 45, hjust = 1), 
-        ); print(p2)
+        #axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position =  "top"
+        ); print(p1)
 
 
+```
+
+### Fig 2b numbers of root shoots
+```{r include = FALSE}
+tree_data <- readr::read_csv('../../3_output/1_data_products/tree_data.csv')
+```
+
+```{r include = FALSE}
+tree_data$country <- factor(tree_data$country, levels = c("Storfjord", "Malla"))
+tree_data$class <- factor(tree_data$class, levels = c("seedling", "sapling", "tree", "dead"))
+
+# create label information for significance 
+sig <- distinct(tree_data, country, class) %>% 
+  arrange(class, country) %>% 
+  filter(!class == "dead")
+
+sig$y = c(4, 0, 7, 0, 14, 0)
+sig$label = c("ns", NA, "*", NA, "***", NA)
+
+p2 <- tree_data %>%
+  na.omit() %>%
+  ggplot(aes(class, n_stems, fill = country)) + 
+  geom_boxplot(outlier.shape = NA) +
+  geom_text(data = sig, aes(y = y, label = label), 
+                  position = position_dodge(width = 0)) +
+#  geom_jitter(aes(), alpha = 0.3, position = #position_jitterdodge(jitter.width = 0.3, dodge.width = 0.75)) +
+  ylim(1, 14) + 
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High"), guide = "none") +
+  labs(x = "Size class", y = "Number of root shoots", fill = "Reindeer density") +
+  theme_classic() +
+  theme(panel.border = element_rect(color = "black", fill = NA, size = 1)); print(p2)
+```
+
+### Fig 2c leaf sections
+```{r (down)load data}
+#get_file(node = "3b2xy",
+#         file = "tree_core_data_raw.xlsx",
+#         path = "2_input/1_raw_data", 
+#         remote_path = "raw_data") 
+
+data_raw <- openxlsx::read.xlsx("../../2_input/1_raw_data/tree_core_data_raw.xlsx")
 ```
 
 ```{r}
-ggarrange(p2, p1, 
-          ncol = 2, 
-          labels = c("a", "b"), 
-          widths = c(.5, 2))
+data <- data_raw %>% 
+  dplyr::select(!distance:n_stems) %>% 
+  pivot_longer(!code, names_to = "section", values_to = "leaves")
 
-ggsave("../../3_output/2_graphs/publication_ready/tree_dung_counts2.svg",
-       height = 4, width = 7)
+data$section <- as.numeric(data$section)
+data$leaves <- as.factor(data$leaves)
+
+data <- data %>% 
+  mutate(country = as.factor(ifelse(grepl('N', code), 'Storfjord', 'Malla'))) %>%
+  dplyr::select(code, country, section, leaves)
 ```
 
+```{r}
+data$country <- factor(data$country, levels = c("Storfjord", "Malla"), labels = c( "Low reindeer density", "High reindeer density"))
 
+p3 <- data %>%  
+  filter(leaves == 1) %>% 
+  #ggplot(aes(x = section)) +
+  #geom_histogram() +
+  gghistogram(x = "section", color = "country", fill = "country", bins = 21) +
+  facet_grid(~ country) +
+  scale_color_manual(values = c("#77BFBC", "#EB956A"), labels = c("High", "Low"), guide = "none") + 
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("High", "Low"), guide = "none") +
+  labs(y = "Frequency of leaf presence", x = "Section of the trunk (10 cm)") + 
+  theme_classic() +
+  theme(panel.spacing = unit(.0, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1), 
+        legend.position = "none") + 
+  coord_flip(); print(p3)
+```
 
-## vegetation 
+```{r}
+ ggarrange(p1, p3, p2,
+          ncol = 3, 
+          labels = c("a", "b", "c"), 
+          widths = c(2.5, 4, 2.5), 
+          common.legend = TRUE)
+
+ggsave("../../3_output/2_graphs/publication_ready/Fig2_grazing_signs.svg", height = 4, width = 7.5)
+```
+
+## Fig 3. numbers of trees
+```{r echo = FALSE}
+tree_transect_data_full <- readr::read_csv('../../3_output/1_data_products/tree_transect_data_full.csv')
+tree_transect_data_full %>% head(10)
+
+tree_transect_data_full <- tree_transect_data_full %>% 
+  left_join(transect_data, by = c("transect" = "transect", "country" = "country", "section" = "habitat"))
+```
+
+```{r boxplot of numbers of trees per class,echo = FALSE}
+facet_order <- c("seedling", "sapling", "tree", "dead")
+class_labs <- c("seedlings", "saplings", "trees", "dead trees")
+names(class_labs) <- c("seedling", "sapling", "tree", "dead")
+
+tree_transect_data_full$country <- factor(tree_transect_data_full$country, levels = c("Storfjord", "Malla"))
+
+tree_transect_data_full$class <- factor(tree_transect_data_full$class, levels = c("seedling", "sapling", "tree", "dead"))
+
+# create label information for significance 
+sig <- distinct(tree_transect_data_full, class, section, country) %>%
+  arrange(class, section, country) 
+
+sig$y = c(13, 0, 11, 0, 3, 0, 38, 0, 22, 0, 10, 0, 50, 0, 9, 0, 5, 0, 6.5, 0, 2.5, 0, 0.5, 0)
+sig$label = c("*", NA, "ns", NA, "ns", NA, "***", NA, "***", NA, "**", NA,"ns", NA, "ns", NA, "**", NA, "*", NA, "ns", NA, "ns", NA)
+
+#sig$y = c(16, 0, 42, 0, 20, 0, 40, 0, 24, 0, 14, 0, 52, 0, 11, 0, 14, #0, 18, 0, 4, 0, 3, 0)
+#sig$label = c("*", NA, "ns", NA, "ns", NA, "***", NA, "***", NA, #"**", NA,"ns", NA, "ns", NA, "**", NA, "*", NA, "ns", NA, "ns", NA)
+
+p1 <- tree_transect_data_full %>%
+  mutate(class = factor(class, levels = facet_order)) %>% 
+  #filter(class != "dead" & class != "tree") %>%  
+  ggplot(aes(section, n, fill = country)) + 
+  geom_boxplot(outliers = FALSE) +
+#  geom_jitter(aes(), alpha = 0.3, position = #position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) + 
+  geom_text(data = sig, aes(y = y, label = label), 
+                  position = position_dodge(width = 0)) +
+  theme_classic() +
+  facet_wrap(~class, scales = "free", drop = TRUE, ncol = 4,
+             labeller = labeller(class = class_labs)) + 
+  labs(fill = "Reindeer density", x = "Habitat", y = "Count") +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
+  theme(panel.spacing = unit(.0, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), legend.position = "top", 
+        strip.background = element_rect(color = "black", size = 1),
+        axis.text.x = element_text(angle = 45, hjust = 1)); print(p1)
+
+ggsave("../../3_output/2_graphs/publication_ready/Fig3_tree_counts1.svg", height = 4, width = 4.5)
+```
+
+## Fig 4. vegetation 
 **vegetation data**
 ```{r echo = FALSE}
 vegetation_data <- readr::read_csv('../../2_input/1_raw_data/vegetation_data_raw.csv')
@@ -381,10 +429,10 @@ gg_ordisurf(ord = nmds, env.var = meta_data$aspect, binwidth = 5)
 ### CCA
 ```{r include = FALSE}
 x <-  meta_data %>% 
-  select(salix:rock) 
+  dplyr::select(salix:rock) 
   
 y <- meta_data %>% 
-  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+  dplyr::select(country, habitat, dung_count:twi, NO3:CN_ratio)
 ```
 
 #### country controlling for habitat
@@ -397,11 +445,13 @@ permutest(main_cca, permutations = how(nperm = 999))
 # get CCA scores ready for plotting
 species_cca <- fortify(main_cca) %>% 
   filter(score == "species")
+species_cca[3:8] <- species_cca[, 3:8] * 2.5 
+species_cca$label <- c("Salix", "B. nana", "decid. dwarf shrubs", "J. communis", "evergr. dwarf shrubs", "graminoids", "forbs", "ferns", "bryophytes", "lichens", "bare ground", "rock")
 
 meta_cca <- fortify(main_cca) %>% 
   filter(score == "sites") %>% 
   column_to_rownames("label") %>% 
-  select(!score)
+  dplyr::select(!score)
   
 meta_cca <- cbind(y, meta_cca)
 
@@ -412,18 +462,20 @@ hull_data <- meta_cca %>% # find convex hulls
   slice(chull(CCA1, CA1))
 
 ggplot() + 
-  geom_point(data = meta_cca, aes(x = CCA1, y = CA1, shape = habitat, colour = country), size = 3) + # add the point markers
-  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
-  geom_polygon(data = hull_data, aes(x = CCA1, y = CA1, fill = country, color = country),alpha=0.30) + 
-  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
-  geom_text(data = species_cca,aes(x = CCA1, y = CA1, label = label), alpha = 0.5) +  # add the species labels
+  geom_polygon(data = hull_data, aes(x = CCA1, y = CA1, fill = country, color = country), alpha = 0.30) + 
+  geom_point(data = meta_cca, aes(x = CCA1, y = CA1, shape = habitat, colour = country), size = 3, alpha = 0.70) + # add the point markers
+     scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("High", "Low")) + 
+  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("High", "Low")) +
+  geom_text(data = species_cca, aes(x = CCA1, y = CA1, label = label), size = 4,  alpha = 0.7) +  # add the species labels
   #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
   coord_equal() +
-  labs(fill = "Grazing regime", color = "Grazing regime", shape = "Habitat") +
+  labs(fill = "Reindeer density", color = "Reindeer density", shape = "Habitat") +
   theme_classic() +
   guides(color = guide_legend(override.aes = list(shape = NA))) +
   theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1))
+
+ggsave("../../3_output/2_graphs/publication_ready/Fig4_cca.svg", height = 3.5, width = 7)
 ```
 
 #### country * habitat
@@ -543,32 +595,8 @@ ggplot() +
         strip.background = element_rect(color = "black", size = 1))
 ```
 
-
-### type cover
-```{r echo = FALSE}
-vegetation_data_l <- readr::read_csv('../../2_input/1_raw_data/vegetation_data_raw.csv') %>% 
-  pivot_longer(salix:bareGr, names_to = "type", values_to = "cover")
-
-vegetation_data_l %>% head(10)
-```
-
-```{r}
-vegetation_data %>% 
-  ggplot(aes(x = type, y = cover, fill = country)) +
-  geom_boxplot()
-
-```
-
-```{r}
-vegetation_data %>% 
-  na.omit() %>% 
-  map(~ ggplot(aes(x = habitat, y = .x, fill = country)) +
-  geom_boxplot())
-```
-
-
-## chem 
-##### Mineralized nutrients
+## Fig 5. chem 
+### Mineralized nutrients
 ```{r}
 dnp <- read_excel("../../2_input/1_raw_data/chem/DNP.xlsx") %>% 
   mutate(country = as.factor(ifelse(grepl('N', code), 'Storfjord', 'Malla')))
@@ -577,7 +605,7 @@ dnp <- read_excel("../../2_input/1_raw_data/chem/DNP.xlsx") %>%
 ```{r}
 dnp$country <- factor(dnp$country, levels = c("Storfjord", "Malla"))
 ```
-##### Phosphate (PO4)
+#### Phosphate (PO4)
 ```{r phosphate boxplot, echo = FALSE}
 p1 <- dnp %>% 
   na.omit() %>% 
@@ -587,7 +615,7 @@ p1 <- dnp %>%
   geom_boxplot() 
 ```
 
-##### Ammonium (NH4)
+#### Ammonium (NH4)
 ```{r ammonium boxplot, echo = FALSE}
 p2 <- dnp %>% 
   na.omit() %>% 
@@ -597,7 +625,7 @@ p2 <- dnp %>%
   geom_boxplot()
 ```
 
-##### Nitrate (NO3)
+#### Nitrate (NO3)
 ```{r, echo = FALSE}
 p3 <- dnp %>% 
   na.omit() %>% 
@@ -643,11 +671,16 @@ cn_soil$country <- factor(cn_soil$country, levels = c("N", "F"))
 ```{r soil carbpm boxplot, echo = FALSE}
 p1 <- cn_soil %>% 
   ggplot(aes(y = wC, fill = country)) +
-  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
-  theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot()
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
+  labs(fill = "Reindeer density", y = "ωC") +
+  theme_classic()  +
+  geom_boxplot() + 
+  geom_text(aes(y = 48, label = "ns", x = 0), 
+                  position = position_dodge(width = 0)) +
+  theme(axis.text.x = element_blank(), 
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1)) 
 ```
 
 #### delta13C
@@ -655,10 +688,16 @@ p1 <- cn_soil %>%
 p2 <- cn_soil %>% 
   ggplot(aes(fill = country, y = d13C)) +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
+  labs(y = "δ13C") +
+  theme_classic() +
   theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot()
+        axis.title.x = element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") +
+  geom_boxplot() +
+geom_text(aes(y = -26.2, label = "ns", x = 0), 
+                  position = position_dodge(width = 0)) 
 ```
 
 #### % nitrogen
@@ -666,10 +705,16 @@ p2 <- cn_soil %>%
 p3 <- cn_soil %>% 
   ggplot(aes(y = wN, fill = country)) +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
+  labs(y = "ωN") +
+  theme_classic() +
   theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot()
+        axis.title.x = element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") +
+  geom_boxplot() +
+geom_text(data = sig, aes(y = 2, label = "ns", x = 0), 
+                  position = position_dodge(width = 0)) 
 ```
 
 #### delta15N
@@ -677,19 +722,28 @@ p3 <- cn_soil %>%
 p4 <- cn_soil %>% 
   ggplot(aes(y = d15N, fill = country)) +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
+  labs(y = "δ15N") +
+  theme_classic() +
   theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot() 
+        axis.title.x = element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") +
+  geom_boxplot() +
+geom_text(data = sig, aes(y = 3.5, label = "ns", x = 0), 
+                  position = position_dodge(width = 0)) 
 ```
 
 ```{r}
-ggarrange(p1, p2, p3, p4, 
-          ncol = 2, nrow = 2,
-          common.legend = TRUE)
+pa <- ggarrange(p1, p2, p3, p4, 
+                #labels = c("a", "b", "c", "d"),
+                ncol = 4, nrow = 1,
+                common.legend = TRUE)
 
-ggsave("../../3_output/2_graphs/publication_ready/soil_chem.svg",
-       height = 4, width = 4)
+pa <- annotate_figure(pa, left = text_grob("Soil", rot = 90, face = "bold", hjust = 1.1)); print(pa)
+
+#ggsave("../../3_output/2_graphs/publication_ready/soil_chem.svg",
+#       height = 2, width = 4)
 ```
 
 ### leaves
@@ -701,11 +755,17 @@ cn_leaf$country <- factor(cn_leaf$country, levels = c("N", "F"))
 ```{r leaf carbon boxplot, echo = FALSE}
 p1 <- cn_leaf %>% 
   ggplot(aes(fill = country, y = wC)) +
-  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
+  labs(fill = "Reindeer density", y = "ωC") +
+  theme_classic() +
   theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot()
+        axis.title.x = element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") +
+  geom_boxplot(outliers = FALSE) +
+geom_text(aes(y = 49.8, label = "**", x = 0), 
+                  position = position_dodge(width = 0)) 
 ```
 
 #### delta13C
@@ -713,10 +773,16 @@ p1 <- cn_leaf %>%
 p2 <- cn_leaf %>% 
   ggplot(aes(fill = country, y = d13C)) +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
+  labs(y = "δ13C") +
+  theme_classic() +
   theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot()
+        axis.title.x = element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") +
+  geom_boxplot() +
+geom_text(aes(y = -29.6, label = "ns", x = 0), 
+                  position = position_dodge(width = 0)) 
 ```
 
 #### % nitrogen
@@ -724,10 +790,16 @@ p2 <- cn_leaf %>%
 p3 <- cn_leaf %>% 
   ggplot(aes(fill = country, y = wN)) +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
+  labs(y = "ωN") +
+  theme_classic() +
   theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot()
+        axis.title.x = element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") +
+  geom_boxplot() +
+geom_text(aes(y = 3.2, label = "ns", x = 0), 
+                  position = position_dodge(width = 0)) 
 ```
 
 #### delta15N
@@ -735,26 +807,44 @@ p3 <- cn_leaf %>%
 p4 <- cn_leaf %>% 
   ggplot(aes(fill = country, y = d15N)) +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  theme_bw() +
+  labs(y = "δ15N") +
+  theme_classic() +
   theme(axis.text.x=element_blank(), 
-        axis.ticks.x=element_blank()) +
-  geom_boxplot()
+        axis.title.x = element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") +
+  geom_boxplot(outliers = FALSE) +
+geom_text(aes(y = 1, label = "*", x = 0), 
+                  position = position_dodge(width = 0)) 
 ```
 
 ```{r}
-ggarrange(p1, p2, p3, p4, 
-          ncol = 2, nrow = 2,
-          common.legend = TRUE)
+pb <- ggarrange(p1, p2, p3, p4, 
+                #labels = c("e", "f", "g", "h"),
+                ncol = 4, nrow = 1)
 
-ggsave("../../3_output/2_graphs/publication_ready/leaf_chem.svg",
-       height = 4, width = 4)
+pb <- annotate_figure(pb, left = text_grob("Leaves", rot = 90, face = "bold")); print(pb)
+
+#ggsave("../../3_output/2_graphs/publication_ready/leaf_chem.svg",
+#       height = 4, width = 4)
 ```
 
-# Supplementary materials
+```{r}
+ggarrange(pa, pb,
+          nrow = 2,
+          heights = c(1, 0.8))
+
+ggsave("../../3_output/2_graphs/publication_ready/Fig5_soil_leaf_chem.svg",
+       height = 4, width = 5.5)
+```
+
+
+# ESM
 ## reindeer numbers over time 
 ```{r}
 x <- read.csv("../../2_input/1_raw_data/reindeer_numbers.csv") %>% 
-  select(Year, Bassevuovdi, Kasivarsi) %>% 
+  dplyr::select(Year, Bassevuovdi, Kasivarsi) %>% 
   pivot_longer(Bassevuovdi:Kasivarsi, names_to = "District", values_to = "n_KM2")
 ```
 
@@ -763,89 +853,174 @@ ggplot(x, aes(x = Year, y = n_KM2, color = District)) +
   geom_line() +
   geom_point() + 
   labs(x = "Year", y = "# reindeer/km2") +
-  scale_color_manual(values = c("#77BFBC", "#EB956A"), labels = c("Bassevuovdi (winter)", "Käsivarsi (year-round)")) +
+  scale_color_manual(values = c("#77BFBC", "#EB956A"), labels = c("Bassevuovdi (Norway)", "Käsivarsi (Finland)")) +
   theme_classic() + 
   theme(legend.position = c(0.8, 0.5),
         panel.border = element_rect(color = "black", fill = NA, size = 1))
 
-ggsave("../../3_output/2_graphs/publication_ready/reindeer_numbers.svg",
+ggsave("../../3_output/2_graphs/publication_ready/FigSx_reindeer_numbers.svg",
        height = 4, width = 6)
 ```
 
-## leaf sections 
-```{r (down)load data}
-#get_file(node = "3b2xy",
-#         file = "tree_core_data_raw.xlsx",
-#         path = "2_input/1_raw_data", 
-#         remote_path = "raw_data") 
+## functional type covers
+```{r echo = FALSE}
+vegetation_data_l <- readr::read_csv('../../2_input/1_raw_data/vegetation_data_raw.csv') %>% 
+  pivot_longer(salix:bareGr, names_to = "type", values_to = "cover")
 
-data_raw <- openxlsx::read.xlsx("../../2_input/1_raw_data/tree_core_data_raw.xlsx")
+vegetation_data_l %>% head(10)
 ```
 
 ```{r}
-data <- data_raw %>% 
-  dplyr::select(!distance:n_stems) %>% 
-  pivot_longer(!code, names_to = "section", values_to = "leaves")
+facet_order <- c("forb", "gram", "lich", "bry", "bareGr", "salix", "Bnana", "Jcomm", "dDwarf", "eDwarf")
+type_labs <- c("Forbs", "Graminoids", "Lichens", "Bryophytes", "Bare ground", "Salix", "B. nana", "J. communis", "Evergr. dwarf shrubs", "Dedid. dwarf shrubs")
+names(type_labs) <- c("forb", "gram", "lich", "bry", "bareGr", "salix", "Bnana", "Jcomm", "dDwarf", "eDwarf")
 
-data$section <- as.numeric(data$section)
-data$leaves <- as.factor(data$leaves)
-
-data <- data %>% 
-  mutate(country = as.factor(ifelse(grepl('N', code), 'Storfjord', 'Malla'))) %>%
-  dplyr::select(code, country, section, leaves)
+vegetation_data_l %>% 
+  dplyr::filter(!type == "ferns") %>% # omit ferns 
+  mutate(type = factor(type, levels = facet_order)) %>% # order of facets
+  mutate(country = factor(country, levels = c("N", "F"))) %>% # order of bars
+  ggplot(aes(x = habitat, y = cover, fill = country)) +
+  geom_boxplot(outliers = FALSE) + 
+  facet_wrap(~type, scales = "free_y", nrow = 2,
+             labeller = labeller(type = type_labs)) +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
+  labs(fill = "Reindeer density", x = "Habitat", y = "% Cover") +
+  theme_classic() + 
+  theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "top", 
+        axis.line=element_line(),
+        axis.text.x = element_text(angle = 25, hjust = 1))
 ```
 
+
 ```{r}
-labs <- c("Year-round", "Winter")
-names(labs) <- c("Malla", "Storfjord")
+ggsave("../../3_output/2_graphs/publication_ready/FigSx_type_covers.svg", height = 5, width = 7)
+```
 
-data$country <- factor(data$country, levels = c("Malla", "Storfjord"), labels = c("Year-round", "Winter"))
+# Defunct
 
-p1 <- data %>%  
-  filter(leaves == 1) %>% 
-  #ggplot(aes(x = section)) +
-  #geom_histogram() +
-  #facet_grid(rows = vars(country))
-  gghistogram(x = "section", color = "country", fill = "country", bins = 21) +
-  facet_grid(~ factor(country, levels=c( "Winter", "Year-round"))) +
-  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
-  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
+```{r}
+vegetation_data %>% 
+  na.omit() %>% 
+  map(~ ggplot(aes(x = habitat, y = .x, fill = country)) +
+  geom_boxplot())
+```
+## numbers of trees + dung counts
+```{r include = FALSE}
+# transect meta data
+transect_data <- readr::read_csv('../../3_output/1_data_products/transect_data.csv')
+
+transect_data <- readr::read_csv('../../3_output/1_data_products/dung_data_transect_summary.csv') %>% 
+  #select(!frequency) %>% 
+  rename(habitat = section) %>% 
+  full_join(transect_data)
+transect_data %>% head(10)
+```
+
+```{r echo = FALSE}
+tree_transect_data_full <- readr::read_csv('../../3_output/1_data_products/tree_transect_data_full.csv')
+tree_transect_data_full %>% head(10)
+
+tree_transect_data_full <- tree_transect_data_full %>% 
+  left_join(transect_data, by = c("transect" = "transect", "country" = "country", "section" = "habitat"))
+```
+
+
+```{r boxplot of numbers of trees per class,echo = FALSE}
+facet_order <- c("seedling", "sapling", "tree", "dead")
+
+tree_transect_data_full$country <- factor(tree_transect_data_full$country, levels = c("Storfjord", "Malla"))
+
+tree_transect_data_full$class <- factor(tree_transect_data_full$class, levels = c("seedling", "sapling", "tree", "dead"))
+
+# create label information for significance 
+sig <- distinct(tree_transect_data_full, class, section, country) %>%
+  arrange(class, section, country) 
+
+#sig$y = c(20, 0, 6, 0, 5, 0, 40, 0, 24, 0, 14, 0, 16, 0, 42, 0, 20, 0, 50, 0, 9, 0, 12, 0)
+
+sig$y = c(16, 0, 42, 0, 20, 0, 40, 0, 24, 0, 14, 0, 50, 0, 9, 0, 12, 0, 20, 0, 6, 0, 5, 0)
+
+#sig$label = c("*", NA, "ns", NA, "ns", NA, "***", NA, "***", NA, "**", NA,"ns", NA, "ns", NA, "*", NA, "ns", NA, "ns", NA, "**", NA)
+
+sig$label = c("*", NA, "ns", NA, "ns", NA, "***", NA, "***", NA, "**", NA,"ns", NA, "ns", NA, "**", NA, "*", NA, "ns", NA, "ns", NA)
+
+#data.frame(
+#  class = c("seedling", "sapling", "tree", "dead"), 
+#  section = c("forest", "treeline", "tundra"),
+#  start = rep("D. f", 3),
+#  end = rep("D. p", 3),
+#  y = rep(1.05, 3),
+#  label = c("+", "+", "+")
+#) %>%
+#mutate(Behaviour = fct_relevel(class,
+#                                 "seedling", "sapling", "tree", "dead")); signif2
+
+p1 <- tree_transect_data_full %>%
+  mutate(class = factor(class, levels = facet_order)) %>% 
+  #filter(class != "dead" & class != "tree") %>%  
+  ggplot(aes(section, n, fill = country)) + 
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) + 
+  geom_text(data = sig, aes(y = y, label = label), 
+                  position = position_dodge(width = 0)) +
+  theme_classic() +
+  facet_grid(~class, scales = "free", drop = TRUE) + 
+  labs(fill = "Grazing regime", x = "Habitat", y = "Count") +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
   theme(panel.spacing = unit(.0, "lines"),
         panel.border = element_rect(color = "black", fill = NA, size = 1), 
-        strip.background = element_rect(color = "black", size = 1), 
-        legend.position = "none") + 
-  coord_flip()
-
-ggsave("../../3_output/2_graphs/publication_ready/leaf_sections.svg", height = 4, width = 5)
+        strip.background = element_rect(color = "black", size = 1),
+        axis.text.x = element_text(angle = 45, hjust = 1)); print(p1)
 ```
 
-## tree morphology
-```{r include = FALSE}
-tree_data <- readr::read_csv('../../3_output/1_data_products/tree_data.csv')
+```{r echo = FALSE}
+dung_transect_data <- readr::read_csv('../../2_input/2_data_products/dung_data_transect_summary.csv')
+
+dung_transect_data <- dung_transect_data %>% 
+  mutate(country = as.factor(ifelse(grepl('N', transect), 'Storfjord', 'Malla'))) %>%
+  dplyr::select(transect, country, everything())
+
+dung_transect_data %>% head(10)
 ```
 
-```{r}
-tree_data$country <- factor(tree_data$country, levels = c("Storfjord", "Malla"))
+```{r echo = FALSE}
+dung_transect_data$country <- factor(dung_transect_data$country, levels = c("Storfjord", "Malla"))
 
-p2 <- tree_data %>%
-  na.omit() %>%
-  ggplot(aes(class, n_stems, fill = country)) + 
-  geom_boxplot() +
-  #geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75)) +
-  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
-  labs(y = "number of root shoots", fill = "Grazing regime") +
+# create label information for significance 
+sig <- distinct(dung_transect_data, section, country) %>% 
+  arrange(section, country) 
+
+sig$y = c(39, 0, 45, 0, 44, 0)
+sig$label = c("***", NA, "***", NA, "***", NA)
+
+
+p2 <- dung_transect_data %>%
+  ggplot(aes(section, frequency, fill = country)) + 
+  geom_boxplot() + 
+  geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) +
+  geom_text(data = sig, aes(y = y, label = label), 
+                  position = position_dodge(width = 0)) +
   theme_classic() +
-  theme(panel.border = element_rect(color = "black", fill = NA, size = 1))
+  labs(fill = "Grazing regime", x = "Habitat", y = "Dung count") +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round"), guide = "none") +
+  theme(panel.spacing = unit(.0, "lines"),
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1),
+        axis.text.x = element_text(angle = 45, hjust = 1), 
+        ); print(p2)
 
-ggsave("../../3_output/2_graphs/publication_ready/root_shoots.svg", height = 4, width = 4)
+
 ```
 
 ```{r}
- ggarrange(p1, p2, 
+ggarrange(p2, p1, 
           ncol = 2, 
           labels = c("a", "b"), 
-          widths = c(2,2))
+          widths = c(.5, 2))
 
-ggsave("../../3_output/2_graphs/publication_ready/tree_morphology.svg", height = 4, width = 7)
+ggsave("../../3_output/2_graphs/publication_ready/tree_dung_counts2.svg",
+       height = 4, width = 7)
 ```
+
 

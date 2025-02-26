@@ -14,6 +14,13 @@ knitr::opts_chunk$set(error = TRUE)
 require(tidyr)
 require(dplyr)
 require(ggplot2)
+
+require(fitdistrplus)
+require(lme4)
+require(glmmTMB)
+require(emmeans)
+require(DHARMa)
+require(easystats)
 ```
 
 # Data
@@ -61,3 +68,47 @@ dung_transect_data %>%
   ggplot(aes(section, total_dung, fill = country)) + 
   geom_boxplot() 
 ```
+
+```{r seedling count distribution, echo = FALSE}
+dist <- fitdist(dung_transect_data$total_dung, "nbinom")
+plot(dist)
+```
+
+```{r number of seedlings model}
+
+
+# failed to converge
+fit <- glmer.nb(total_dung ~ country * section + (1 | transect), data = dung_transect_data) 
+fit <- glm.nb(n ~ country * section, data = d); AIC(fit)
+fit <- glmmTMB(frequency ~ country * section + (1 | transect), 
+               family = nbinom2, ziformula = ~1, 
+               data = dung_transect_data) ; AIC(fit)
+
+summary(fit)
+anova(fit)
+Anova(fit, type = "II")
+```
+
+```{r}
+emmeans(fit, pairwise ~ country | section)
+```
+
+```{r seedlings model diagnostics}
+simulationOutput <- simulateResiduals(fittedModel = fit)
+plot(simulationOutput)
+testDispersion(simulationOutput); rm(simulationOutput)
+
+check_zeroinflation(fit)
+
+fit <- glmer.nb(n ~ country + section + (1 | transect), data = d)
+x <- check_collinearity(fit)
+plot(x); rm(x)
+```
+
+```{r}
+dung_transect_data %>% 
+  #group_by(country, section) %>% 
+  group_by(country) %>% 
+  summarize(mean_count = mean(total_dung), se = SE(total_dung))
+```
+

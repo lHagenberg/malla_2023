@@ -45,12 +45,13 @@ dung_transect_data$country <- factor(dung_transect_data$country, levels = c("Sto
 sig <- distinct(dung_transect_data, section, country) %>% 
   arrange(section, country) 
 
-sig$y = c(39, 0, 45, 0, 44, 0)
+sig$y = c(70, 0, 91, 0, 88, 0) # total count
+#sig$y = c(39, 0, 45, 0, 44, 0) #frequency
 sig$label = c("***", NA, "***", NA, "***", NA)
 
 
 p1 <- dung_transect_data %>%
-  ggplot(aes(section, frequency, fill = country)) + 
+  ggplot(aes(section, total_dung, fill = country)) + 
   geom_boxplot(outlier.shape = NA) + 
   #geom_jitter(aes(), alpha = 0.3, position = position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) +
   geom_text(data = sig, aes(y = y, label = label), 

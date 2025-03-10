@@ -59,12 +59,13 @@ p1 <- dung_transect_data %>%
   theme_classic() +
   labs(fill = "Reindeer density", x = "Habitat", y = "Dung count") +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
+  scale_x_discrete(labels=c("forest" = "forest", "treeline" = "low tundra",
+                              "tundra" = "high tundra")) +
   theme(panel.spacing = unit(.0, "lines"),
         panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1),
-        #axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position =  "top"
-        ); print(p1)
+        axis.text.x = element_text(angle = 15, hjust = 1),
+        legend.position =  "top"); print(p1)
 
 
 ```
@@ -189,6 +190,8 @@ p1 <- tree_transect_data_full %>%
 #  geom_jitter(aes(), alpha = 0.3, position = #position_jitterdodge(jitter.width = 0, dodge.width = 0.75)) + 
   geom_text(data = sig, aes(y = y, label = label), 
                   position = position_dodge(width = 0)) +
+  scale_x_discrete(labels=c("forest" = "forest", "treeline" = "low tundra",
+                              "tundra" = "high tundra")) +
   theme_classic() +
   facet_wrap(~class, scales = "free", drop = TRUE, ncol = 4,
              labeller = labeller(class = class_labs)) + 
@@ -197,7 +200,7 @@ p1 <- tree_transect_data_full %>%
   theme(panel.spacing = unit(.0, "lines"),
         panel.border = element_rect(color = "black", fill = NA, size = 1), legend.position = "top", 
         strip.background = element_rect(color = "black", size = 1),
-        axis.text.x = element_text(angle = 45, hjust = 1)); print(p1)
+        axis.text.x = element_text(angle = 25, hjust = 1)); print(p1)
 
 ggsave("../../3_output/2_graphs/publication_ready/Fig3_tree_counts1.svg", height = 4, width = 4.5)
 ```
@@ -467,6 +470,7 @@ ggplot() +
   geom_point(data = meta_cca, aes(x = CCA1, y = CA1, shape = habitat, colour = country), size = 3, alpha = 0.70) + # add the point markers
      scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("High", "Low")) + 
   scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("High", "Low")) +
+  scale_shape_manual(values = c(15, 16, 17, 3), labels = c("Forest", "Forest edge", "Low tundra", "High tundra")) + 
   geom_text(data = species_cca, aes(x = CCA1, y = CA1, label = label), size = 4,  alpha = 0.7) +  # add the species labels
   #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
   coord_equal() +
@@ -476,7 +480,7 @@ ggplot() +
   theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1))
 
-ggsave("../../3_output/2_graphs/publication_ready/Fig4_cca.svg", height = 3.5, width = 7)
+ggsave("../../3_output/2_graphs/publication_ready/Fig4_cca.svg", height = 3.5, width = 7.2)
 ```
 
 #### country * habitat
@@ -522,79 +526,7 @@ ggplot() +
 ```
 
 
-#### full model select
-```{r include = FALSE}
-x <-  meta_data %>% 
-  na.omit() %>% # removes data with missing values in the soil chemical composition variables
-  select(salix:rock) 
-  
-y <- meta_data %>% 
-  na.omit() %>% 
-  select(country, habitat, dung_count:twi, NO3:CN_ratio)
-```
 
-```{r}
-null_cca <-
-  cca(x ~ 1, data = y) # model containing only species matrix and intercept
-
-# The step wise selection, based on R2
-sel_cca <-
-  ordiR2step(
-    null_cca,
-    scope = formula (full_cca),
-    R2scope = r2,
-    direction = 'forward',
-    permutations = 999
-  )
-sel_cca
-```
-
-```{r}
-sel_cca_adj <- sel_cca # get adjusted p values from the anova 
-sel_cca_adj$anova$`Pr(>F)` <- p.adjust(sel_cca$anova$`Pr(>F)`, method = 'holm', n = ncol(y)) 
-sel_cca_adj$anova
-```
-
-```{r}
-# get CCA scores ready for plotting
-species_cca <- fortify(sel_cca) %>% 
-  filter(score == "species")
-
-meta_cca <- fortify(sel_cca) %>% 
-  filter(score == "sites") %>% 
-  column_to_rownames("label") %>% 
-  select(!score)
-  
-meta_cca <- cbind(y, meta_cca)
-
-# create convex hulls
-hull_data <- meta_cca %>% # find convex hulls
-  group_by(country) %>% # for each combination of country and habitat
-  arrange(CCA1, CCA2) %>%
-  slice(chull(CCA1, CCA2))
-
-ggplot() + 
-  geom_point(data = meta_cca, aes(x = CCA1, y = CCA2, shape = habitat, colour = country), size = 3) + # add the point markers
-  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
-  geom_polygon(data = hull_data, aes(x = CCA1, y = CCA2, fill = country, color = country),alpha=0.30) + 
-  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
-  geom_text(data = species_cca,aes(x = CCA1, y = CCA2, label = label), alpha = 0.5) +  # add the species labels
-  #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
-  coord_equal() +
-#  geom_segment(aes(x = 0, y = 0, xend = CCA1, yend = CCA2), 
-#       data = ef_coord_cont, linewidth =1, alpha = 0.5, colour = #"grey30") +
-#     geom_point(data = ef_coord_cat, aes(x = CCA1, y = CCA2), 
-#       shape = "diamond", size = 4, alpha = 0.6, colour = "navy") +
-#     geom_text(data = ef_coord_cat, aes(x = CCA1, y = CCA2+0.08), 
-#       label = row.names(ef_coord_cat), colour = "navy", fontface = #"bold") + 
-#     geom_text(data = ef_coord_cont, aes(x = CCA1, y = CCA2), colour = #"grey30", 
-#       fontface = "bold", label = row.names(ef_coord_cont)) + 
-  labs(fill = "Grazing regime", color = "Grazing regime", shape = "Habitat") +
-  theme_classic() +
-  guides(color = guide_legend(override.aes = list(shape = NA))) +
-  theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
-        strip.background = element_rect(color = "black", size = 1))
-```
 
 ## Fig 5. chem 
 ### Mineralized nutrients
@@ -863,6 +795,103 @@ ggsave("../../3_output/2_graphs/publication_ready/FigSx_reindeer_numbers.svg",
        height = 4, width = 6)
 ```
 
+## full model select
+```{r include = FALSE}
+x <-  meta_data %>% 
+  na.omit() %>% # removes data with missing values in the soil chemical composition variables
+  select(salix:rock) 
+  
+y <- meta_data %>% 
+  na.omit() %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+```{r}
+null_cca <-
+  cca(x ~ 1, data = y) # model containing only species matrix and intercept
+
+# The step wise selection, based on R2
+sel_cca <-
+  ordiR2step(
+    null_cca,
+    scope = formula (full_cca),
+    R2scope = r2,
+    direction = 'forward',
+    permutations = 999
+  )
+sel_cca
+```
+
+```{r}
+sel_cca_adj <- sel_cca # get adjusted p values from the anova 
+sel_cca_adj$anova$`Pr(>F)` <- p.adjust(sel_cca$anova$`Pr(>F)`, method = 'holm', n = ncol(y)) 
+sel_cca_adj$anova
+```
+
+```{r echo = FALSE}
+ef <- y %>% 
+  select(NH4, CN_ratio, country, habitat) %>% 
+  envfit(sel_cca, ., na.rm = TRUE); ef
+```
+
+```{r}
+ef_coord_cont <-  as.data.frame(scores(ef, "vectors")) * ordiArrowMul(ef) # map vectors in plot
+#ef_coord_cont <- ef_coord_cont[!(row.names(ef_coord_cont) %in% c("slope", "wN", "wC")),]
+rownames(ef_coord_cont) <- c("ammonium", "C/N ratio") 
+ef_coord_cont <- ef_coord_cont * 1.5
+
+ef_coord_cat = as.data.frame(scores(ef, "factors")) * ordiArrowMul(ef) # map factors in plot
+ef_coord_cat <- ef_coord_cat[1:6,]
+rownames(ef_coord_cat) <- c("Finland", "Norway", "forest", "treeline", "tundra", "high tundra")
+ef_coord_cat <- ef_coord_cat * 1.5
+
+# get CCA scores ready for plotting
+species_cca <- fortify(sel_cca) %>% 
+  filter(score == "species")
+species_cca[, 3:8] <- species_cca[, 3:8] * 3
+species_cca$label <- c("Salix", "B. nana", "decid. dwarf shrubs", "J. communis", "evergr. dwarf shrubs", "graminoids", "forbs", "ferns", "bryophytes", "lichens", "bare ground", "rock")
+
+meta_cca <- fortify(sel_cca) %>% 
+  filter(score == "sites") %>% 
+  column_to_rownames("label") %>% 
+  select(!score)
+  
+meta_cca <- cbind(y, meta_cca)
+
+# create convex hulls
+hull_data <- meta_cca %>% # find convex hulls
+  group_by(country) %>% # for each combination of country and habitat
+  arrange(CCA1, CCA2) %>%
+  slice(chull(CCA1, CCA2))
+
+ggplot() + 
+  geom_point(data = meta_cca, aes(x = CCA1, y = CCA2, shape = habitat, colour = country), size = 3) + # add the point markers
+  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
+  geom_polygon(data = hull_data, aes(x = CCA1, y = CCA2, fill = country, color = country),alpha=0.30) + 
+  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
+  scale_shape_manual(values = c(15, 16, 17, 3), labels = c("Forest", "Forest edge", "Low tundra", "High tundra")) + 
+  geom_text(data = species_cca,aes(x = CCA1, y = CCA2, label = label), alpha = 0.5) +  # add the species labels
+  #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
+  geom_segment(aes(x = 0, y = 0, xend = CCA1, yend = CCA2), 
+       data = ef_coord_cont, linewidth =1, alpha = 0.5, colour = "grey30") +
+     geom_point(data = ef_coord_cat, aes(x = CCA1, y = CCA2), 
+       shape = "diamond", size = 4, alpha = 0.6, colour = "navy") +
+     geom_text(data = ef_coord_cat, aes(x = CCA1, y = CCA2+0.08), 
+       label = row.names(ef_coord_cat), colour = "navy", fontface = "bold") + 
+     geom_text(data = ef_coord_cont, aes(x = CCA1, y = CCA2), colour = "grey30", 
+       fontface = "bold", label = row.names(ef_coord_cont)) + 
+  labs(fill = "Grazing regime", color = "Grazing regime", shape = "Habitat") +
+  theme_classic() +
+  guides(color = guide_legend(override.aes = list(shape = NA))) +
+  theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1))
+```
+
+```{r}
+ggsave("../../3_output/2_graphs/publication_ready/FigSx_CCA_select.svg", height = 3.5, width = 6)
+```
+
+
 ## functional type covers
 ```{r echo = FALSE}
 vegetation_data_l <- readr::read_csv('../../2_input/1_raw_data/vegetation_data_raw.csv') %>% 
@@ -885,6 +914,7 @@ vegetation_data_l %>%
   facet_wrap(~type, scales = "free_y", nrow = 2,
              labeller = labeller(type = type_labs)) +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
+  scale_x_discrete(labels=c("forest" = "forest", "treeline" = "forest edge", "tundra" = "low tundra", "upper_tundra" = "high tundra")) +
   labs(fill = "Reindeer density", x = "Habitat", y = "% Cover") +
   theme_classic() + 
   theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
@@ -897,6 +927,7 @@ vegetation_data_l %>%
 ```{r}
 ggsave("../../3_output/2_graphs/publication_ready/FigSx_type_covers.svg", height = 5, width = 7)
 ```
+
 
 # Defunct
 

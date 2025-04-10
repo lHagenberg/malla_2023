@@ -65,7 +65,7 @@ p1 <- dung_transect_data %>%
         panel.border = element_rect(color = "black", fill = NA, size = 1), 
         strip.background = element_rect(color = "black", size = 1),
         axis.text.x = element_text(angle = 15, hjust = 1),
-        legend.position =  "top"); print(p1)
+        legend.position =  "top", legend.margin = margin(t = -4)); print(p1)
 
 
 ```
@@ -149,7 +149,8 @@ p3 <- data %>%
           ncol = 3, 
           labels = c("a", "b", "c"), 
           widths = c(2.5, 4, 2.5), 
-          common.legend = TRUE)
+          common.legend = TRUE, 
+          legend = "bottom")
 
 ggsave("../../3_output/2_graphs/publication_ready/Fig2_grazing_signs.svg", height = 4, width = 7.5)
 ```
@@ -198,7 +199,9 @@ p1 <- tree_transect_data_full %>%
   labs(fill = "Reindeer density", x = "Habitat", y = "Count") +
   scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Low", "High")) +
   theme(panel.spacing = unit(.0, "lines"),
-        panel.border = element_rect(color = "black", fill = NA, size = 1), legend.position = "top", 
+        panel.border = element_rect(color = "black", fill = NA, size = 1),
+        legend.position = "bottom",
+        legend.margin = margin(t = -8),
         strip.background = element_rect(color = "black", size = 1),
         axis.text.x = element_text(angle = 25, hjust = 1)); print(p1)
 
@@ -465,7 +468,7 @@ hull_data <- meta_cca %>% # find convex hulls
   arrange(CCA1, CA1) %>%
   slice(chull(CCA1, CA1))
 
-ggplot() + 
+p1 <- ggplot() + 
   geom_polygon(data = hull_data, aes(x = CCA1, y = CA1, fill = country, color = country), alpha = 0.30) + 
   geom_point(data = meta_cca, aes(x = CCA1, y = CA1, shape = habitat, colour = country), size = 3, alpha = 0.70) + # add the point markers
      scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("High", "Low")) + 
@@ -473,14 +476,122 @@ ggplot() +
   scale_shape_manual(values = c(15, 16, 17, 3), labels = c("Forest", "Forest edge", "Low tundra", "High tundra")) + 
   geom_text(data = species_cca, aes(x = CCA1, y = CA1, label = label), size = 4,  alpha = 0.7) +  # add the species labels
   #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
-  coord_equal() +
+  #coord_equal() +
   labs(fill = "Reindeer density", color = "Reindeer density", shape = "Habitat") +
   theme_classic() +
   guides(color = guide_legend(override.aes = list(shape = NA))) +
   theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
-        strip.background = element_rect(color = "black", size = 1))
+        strip.background = element_rect(color = "black", size = 1)); print(p1)
 
-ggsave("../../3_output/2_graphs/publication_ready/Fig4_cca.svg", height = 3.5, width = 7.2)
+#ggsave("../../3_output/2_graphs/publication_ready/Fig4_cca.svg", height = 3.5, width = 7.2)
+```
+
+#### full model select
+```{r include = FALSE}
+x <-  meta_data %>% 
+  na.omit() %>% # removes data with missing values in the soil chemical composition variables
+  select(salix:rock) 
+  
+y <- meta_data %>% 
+  na.omit() %>% 
+  select(country, habitat, dung_count:twi, NO3:CN_ratio)
+```
+
+```{r}
+null_cca <-
+  cca(x ~ 1, data = y) # model containing only species matrix and intercept
+
+# The step wise selection, based on R2
+sel_cca <-
+  ordiR2step(
+    null_cca,
+    scope = formula (full_cca),
+    R2scope = r2,
+    direction = 'forward',
+    permutations = 999
+  )
+sel_cca
+```
+
+```{r}
+sel_cca_adj <- sel_cca # get adjusted p values from the anova 
+sel_cca_adj$anova$`Pr(>F)` <- p.adjust(sel_cca$anova$`Pr(>F)`, method = 'holm', n = ncol(y)) 
+sel_cca_adj$anova
+```
+
+```{r echo = FALSE}
+ef <- y %>% 
+  select(NH4, CN_ratio, country, habitat) %>% 
+  envfit(sel_cca, ., na.rm = TRUE); ef
+```
+
+```{r}
+ef_coord_cont <-  as.data.frame(scores(ef, "vectors")) * ordiArrowMul(ef) # map vectors in plot
+#ef_coord_cont <- ef_coord_cont[!(row.names(ef_coord_cont) %in% c("slope", "wN", "wC")),]
+rownames(ef_coord_cont) <- c("ammonium", "C/N ratio") 
+ef_coord_cont <- ef_coord_cont * 2
+
+ef_coord_cat = as.data.frame(scores(ef, "factors")) * ordiArrowMul(ef) # map factors in plot
+ef_coord_cat <- ef_coord_cat[1:6,]
+rownames(ef_coord_cat) <- c("Finland", "Norway", "forest", "treeline", "tundra", "high tundra")
+ef_coord_cat <- ef_coord_cat * 1.5
+ef_coord_cat <- ef_coord_cat[3:6,]
+
+# get CCA scores ready for plotting
+species_cca <- fortify(sel_cca) %>% 
+  filter(score == "species")
+species_cca[, 3:8] <- species_cca[, 3:8] * 3
+species_cca$label <- c("Salix", "B. nana", "decid. dwarf shrubs", "J. communis", "evergr. dwarf shrubs", "graminoids", "forbs", "ferns", "bryophytes", "lichens", "bare ground", "rock")
+
+meta_cca <- fortify(sel_cca) %>% 
+  filter(score == "sites") %>% 
+  column_to_rownames("label") %>% 
+  select(!score)
+  
+meta_cca <- cbind(y, meta_cca)
+
+# create convex hulls
+hull_data <- meta_cca %>% # find convex hulls
+  group_by(country) %>% # for each combination of country and habitat
+  arrange(CCA1, CCA2) %>%
+  slice(chull(CCA1, CCA2))
+
+p2 <- ggplot() + 
+  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
+  geom_polygon(data = hull_data, aes(x = CCA1, y = CCA2, fill = country, color = country),alpha=0.30) + 
+  geom_point(data = meta_cca, aes(x = CCA1, y = CCA2, shape = habitat, colour = country), size = 3) + # add the point markers
+  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
+  scale_shape_manual(values = c(15, 16, 17, 3), labels = c("Forest", "Forest edge", "Low tundra", "High tundra")) + 
+  geom_text(data = species_cca,aes(x = CCA1, y = CCA2, label = label), size = 4,  alpha = 0.7) +  # add the species labels
+  #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
+  geom_segment(aes(x = 0, y = 0, xend = CCA1, yend = CCA2), 
+       data = ef_coord_cont, linewidth =1, alpha = 0.5, colour = "grey30") +
+     geom_point(data = ef_coord_cat, aes(x = CCA1, y = CCA2), 
+       shape = "diamond", size = 4, alpha = 0.6, colour = "navy") +
+     geom_text(data = ef_coord_cat, aes(x = CCA1, y = CCA2+0.08), 
+       label = row.names(ef_coord_cat), colour = "navy", fontface = "bold") + 
+     geom_text(data = ef_coord_cont, aes(x = CCA1, y = CCA2), colour = "grey30", 
+       fontface = "bold", label = row.names(ef_coord_cont)) + 
+  labs(fill = "Grazing regime", color = "Grazing regime", shape = "Habitat") +
+  theme_classic() +
+  guides(color = guide_legend(override.aes = list(shape = NA))) +
+  theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        strip.background = element_rect(color = "black", size = 1)); print(p2)
+```
+
+```{r}
+ ggarrange(p1, p2,
+          ncol = 2, 
+          labels = c("a", "b"), 
+          widths = c(4, 4), 
+          common.legend = TRUE, 
+          legend = "bottom")
+
+ggsave("../../3_output/2_graphs/publication_ready/Fig4_CCAs.svg", height = 4, width = 7.5)
+```
+
+```{r}
+ggsave("../../3_output/2_graphs/publication_ready/FigSx_CCA_select.svg", height = 3.5, width = 6)
 ```
 
 #### country * habitat
@@ -613,7 +724,8 @@ p1 <- cn_soil %>%
   theme(axis.text.x = element_blank(), 
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank(),
-        panel.border = element_rect(color = "black", fill = NA, size = 1)) 
+        panel.border = element_rect(color = "black", fill = NA, size = 1), 
+        legend.position = "none") 
 ```
 
 #### delta13C
@@ -637,7 +749,7 @@ geom_text(aes(y = -26.2, label = "ns", x = 0),
 ```{r soil nitrogen boxplot, echo = FALSE}
 p3 <- cn_soil %>% 
   ggplot(aes(y = wN, fill = country)) +
-  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A", "black", "black"), labels = c("Winter", "Year-round")) +
   labs(y = "ωN") +
   theme_classic() +
   theme(axis.text.x=element_blank(), 
@@ -654,7 +766,7 @@ geom_text(data = sig, aes(y = 2, label = "ns", x = 0),
 ```{r soil d15N boxplot, echo = FALSE}
 p4 <- cn_soil %>% 
   ggplot(aes(y = d15N, fill = country)) +
-  scale_fill_manual(values = c("#77BFBC", "#EB956A"), labels = c("Winter", "Year-round")) +
+  scale_fill_manual(values = c("#77BFBC", "#EB956A", "black", "black"), labels = c("Winter", "Year-round")) +
   labs(y = "δ15N") +
   theme_classic() +
   theme(axis.text.x=element_blank(), 
@@ -670,8 +782,7 @@ geom_text(data = sig, aes(y = 3.5, label = "ns", x = 0),
 ```{r}
 pa <- ggarrange(p1, p2, p3, p4, 
                 #labels = c("a", "b", "c", "d"),
-                ncol = 4, nrow = 1,
-                common.legend = TRUE)
+                ncol = 4, nrow = 1)
 
 pa <- annotate_figure(pa, left = text_grob("Soil", rot = 90, face = "bold", hjust = 1.1)); print(pa)
 
@@ -694,8 +805,8 @@ p1 <- cn_leaf %>%
   theme(axis.text.x=element_blank(), 
         axis.title.x = element_blank(),
         axis.ticks.x=element_blank(),
-        panel.border = element_rect(color = "black", fill = NA, size = 1), 
-        legend.position = "none") +
+        panel.border = element_rect(color = "black", fill = NA, size = 1),
+        legend.margin = margin(t = -4)) +
   geom_boxplot(outliers = FALSE) +
 geom_text(aes(y = 49.8, label = "**", x = 0), 
                   position = position_dodge(width = 0)) 
@@ -755,7 +866,9 @@ geom_text(aes(y = 1, label = "*", x = 0),
 ```{r}
 pb <- ggarrange(p1, p2, p3, p4, 
                 #labels = c("e", "f", "g", "h"),
-                ncol = 4, nrow = 1)
+                ncol = 4, nrow = 1, 
+                common.legend = TRUE, 
+                legend = "bottom")
 
 pb <- annotate_figure(pb, left = text_grob("Leaves", rot = 90, face = "bold")); print(pb)
 
@@ -766,7 +879,7 @@ pb <- annotate_figure(pb, left = text_grob("Leaves", rot = 90, face = "bold")); 
 ```{r}
 ggarrange(pa, pb,
           nrow = 2,
-          heights = c(1, 0.8))
+          heights = c(0.8, 1))
 
 ggsave("../../3_output/2_graphs/publication_ready/Fig5_soil_leaf_chem.svg",
        height = 4, width = 5.5)
@@ -795,101 +908,7 @@ ggsave("../../3_output/2_graphs/publication_ready/FigSx_reindeer_numbers.svg",
        height = 4, width = 6)
 ```
 
-## full model select
-```{r include = FALSE}
-x <-  meta_data %>% 
-  na.omit() %>% # removes data with missing values in the soil chemical composition variables
-  select(salix:rock) 
-  
-y <- meta_data %>% 
-  na.omit() %>% 
-  select(country, habitat, dung_count:twi, NO3:CN_ratio)
-```
 
-```{r}
-null_cca <-
-  cca(x ~ 1, data = y) # model containing only species matrix and intercept
-
-# The step wise selection, based on R2
-sel_cca <-
-  ordiR2step(
-    null_cca,
-    scope = formula (full_cca),
-    R2scope = r2,
-    direction = 'forward',
-    permutations = 999
-  )
-sel_cca
-```
-
-```{r}
-sel_cca_adj <- sel_cca # get adjusted p values from the anova 
-sel_cca_adj$anova$`Pr(>F)` <- p.adjust(sel_cca$anova$`Pr(>F)`, method = 'holm', n = ncol(y)) 
-sel_cca_adj$anova
-```
-
-```{r echo = FALSE}
-ef <- y %>% 
-  select(NH4, CN_ratio, country, habitat) %>% 
-  envfit(sel_cca, ., na.rm = TRUE); ef
-```
-
-```{r}
-ef_coord_cont <-  as.data.frame(scores(ef, "vectors")) * ordiArrowMul(ef) # map vectors in plot
-#ef_coord_cont <- ef_coord_cont[!(row.names(ef_coord_cont) %in% c("slope", "wN", "wC")),]
-rownames(ef_coord_cont) <- c("ammonium", "C/N ratio") 
-ef_coord_cont <- ef_coord_cont * 1.5
-
-ef_coord_cat = as.data.frame(scores(ef, "factors")) * ordiArrowMul(ef) # map factors in plot
-ef_coord_cat <- ef_coord_cat[1:6,]
-rownames(ef_coord_cat) <- c("Finland", "Norway", "forest", "treeline", "tundra", "high tundra")
-ef_coord_cat <- ef_coord_cat * 1.5
-
-# get CCA scores ready for plotting
-species_cca <- fortify(sel_cca) %>% 
-  filter(score == "species")
-species_cca[, 3:8] <- species_cca[, 3:8] * 3
-species_cca$label <- c("Salix", "B. nana", "decid. dwarf shrubs", "J. communis", "evergr. dwarf shrubs", "graminoids", "forbs", "ferns", "bryophytes", "lichens", "bare ground", "rock")
-
-meta_cca <- fortify(sel_cca) %>% 
-  filter(score == "sites") %>% 
-  column_to_rownames("label") %>% 
-  select(!score)
-  
-meta_cca <- cbind(y, meta_cca)
-
-# create convex hulls
-hull_data <- meta_cca %>% # find convex hulls
-  group_by(country) %>% # for each combination of country and habitat
-  arrange(CCA1, CCA2) %>%
-  slice(chull(CCA1, CCA2))
-
-ggplot() + 
-  geom_point(data = meta_cca, aes(x = CCA1, y = CCA2, shape = habitat, colour = country), size = 3) + # add the point markers
-  scale_color_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) + 
-  geom_polygon(data = hull_data, aes(x = CCA1, y = CCA2, fill = country, color = country),alpha=0.30) + 
-  scale_fill_manual(values = c("#EB956A", "#77BFBC"), labels = c("Year-round", "Winter")) +
-  scale_shape_manual(values = c(15, 16, 17, 3), labels = c("Forest", "Forest edge", "Low tundra", "High tundra")) + 
-  geom_text(data = species_cca,aes(x = CCA1, y = CCA2, label = label), alpha = 0.5) +  # add the species labels
-  #geom_text(data = data_scores, aes(x = NMDS1, y = NMDS2, label = plot), vjust=0) +  # add the site labels
-  geom_segment(aes(x = 0, y = 0, xend = CCA1, yend = CCA2), 
-       data = ef_coord_cont, linewidth =1, alpha = 0.5, colour = "grey30") +
-     geom_point(data = ef_coord_cat, aes(x = CCA1, y = CCA2), 
-       shape = "diamond", size = 4, alpha = 0.6, colour = "navy") +
-     geom_text(data = ef_coord_cat, aes(x = CCA1, y = CCA2+0.08), 
-       label = row.names(ef_coord_cat), colour = "navy", fontface = "bold") + 
-     geom_text(data = ef_coord_cont, aes(x = CCA1, y = CCA2), colour = "grey30", 
-       fontface = "bold", label = row.names(ef_coord_cont)) + 
-  labs(fill = "Grazing regime", color = "Grazing regime", shape = "Habitat") +
-  theme_classic() +
-  guides(color = guide_legend(override.aes = list(shape = NA))) +
-  theme(panel.border = element_rect(color = "black", fill = NA, size = 1), 
-        strip.background = element_rect(color = "black", size = 1))
-```
-
-```{r}
-ggsave("../../3_output/2_graphs/publication_ready/FigSx_CCA_select.svg", height = 3.5, width = 6)
-```
 
 
 ## functional type covers
